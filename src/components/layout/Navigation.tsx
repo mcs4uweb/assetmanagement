@@ -1,57 +1,121 @@
 // src/components/Layout/Navigation.tsx
-'use client'
+'use client';
 
-import React, { useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
-import { useAuth } from '../../contexts/AuthContext'
-import { useCart } from '../../contexts/CartContext'
+import React, { useEffect, useRef, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCart } from '../../contexts/CartContext';
+
+const THEME_STORAGE_KEY = 'assetmanagement-theme';
 
 const Navigation: React.FC = () => {
-  const { currentUser, logout } = useAuth()
-  const { cartTotal } = useCart()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { currentUser, logout } = useAuth();
+  const { cartTotal } = useCart();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const applyTheme = (preferDark: boolean) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const root = window.document.documentElement;
+    if (preferDark) {
+      root.classList.add('dark');
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'dark');
+    } else {
+      root.classList.remove('dark');
+      window.localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    }
+    setIsDarkMode(preferDark);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const prefersDark = storedTheme
+      ? storedTheme === 'dark'
+      : window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    applyTheme(prefersDark);
+  }, []);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+    setIsProfileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    if (isProfileMenuOpen) {
+      window.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isProfileMenuOpen]);
 
   const handleLogout = async () => {
     try {
-      await logout()
-      router.push('/login')
+      await logout();
+      router.push('/login');
     } catch (error) {
-      console.error('Failed to log out:', error)
+      console.error('Failed to log out:', error);
     }
-  }
+  };
 
   const navigation = [
     { name: 'My Assets', href: '/home', current: pathname === '/home' },
     { name: 'Cart', href: '/cart', current: pathname === '/cart' },
     { name: 'My Orders', href: '/myorders', current: pathname === '/myorders' },
     { name: 'Settings', href: '/settings', current: pathname === '/settings' },
-  ]
+  ];
+
+  const handleThemeToggle = () => {
+    applyTheme(!isDarkMode);
+  };
 
   return (
-    <nav className="bg-white shadow-lg">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-blue-600">Asset Tracker</h1>
+    <nav className='bg-white shadow-lg dark:bg-gray-900'>
+      <div className='mx-auto max-w-7xl px-4'>
+        <div className='flex h-16 justify-between'>
+          <div className='flex items-center'>
+            <div className='flex items-center flex-shrink-0'>
+              <h1 className='text-xl font-bold text-blue-600 dark:text-blue-400'>
+                Asset Tracker
+              </h1>
             </div>
-            
-            <div className="hidden md:ml-6 md:flex md:space-x-4">
+
+            <div className='hidden md:ml-6 md:flex md:space-x-4'>
               {navigation.map((item) => (
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
-                  className={`${
+                  className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium ${
                     item.current
-                      ? 'border-blue-500 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                      ? 'border-blue-500 text-gray-900 dark:text-gray-100'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-100'
+                  }`}
                 >
                   {item.name}
                   {item.name === 'Cart' && cartTotal > 0 && (
-                    <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                    <span className='ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white'>
                       {cartTotal}
                     </span>
                   )}
@@ -60,24 +124,135 @@ const Navigation: React.FC = () => {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center space-x-4">
-            <span className="text-gray-700">{currentUser?.DisplayName}</span>
-            <button
-              onClick={handleLogout}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              Logout
-            </button>
+          <div className='hidden items-center space-x-4 md:flex'>
+            <span className='text-gray-700 dark:text-gray-200'>
+              {currentUser?.DisplayName}
+            </span>
+            <div className='relative' ref={profileMenuRef}>
+              <button
+                type='button'
+                onClick={() => setIsProfileMenuOpen((value) => !value)}
+                className='flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700'
+                aria-haspopup='menu'
+                aria-expanded={isProfileMenuOpen}
+                aria-label='Open profile menu'
+              >
+                <svg
+                  xmlns='http://www.w3.org/2000/svg'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  strokeWidth={1.5}
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  className='h-5 w-5'
+                >
+                  <path d='M16.5 7a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z' />
+                  <path d='M4.5 20.25a8.75 8.75 0 0115 0' />
+                </svg>
+              </button>
+
+              {isProfileMenuOpen && (
+                <div
+                  role='menu'
+                  className='absolute right-0 z-20 mt-2 w-48 rounded-lg border border-gray-100 bg-white py-2 shadow-lg ring-1 ring-black ring-opacity-5 dark:border-gray-700 dark:bg-gray-800'
+                >
+                  <button
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      router.push('/settings');
+                    }}
+                    className='flex w-full items-center px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    role='menuitem'
+                  >
+                    <span className='mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200'>
+                      <svg
+                        xmlns='http://www.w3.org/2000/svg'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth={1.5}
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        className='h-4 w-4'
+                      >
+                        <path d='M16 7a4 4 0 11-8 0 4 4 0 018 0z' />
+                        <path d='M12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' />
+                      </svg>
+                    </span>
+                    Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleThemeToggle();
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className='flex w-full items-center justify-between px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    role='menuitem'
+                  >
+                    <span className='flex items-center'>
+                      <span className='mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900 dark:text-blue-200'>
+                        <svg
+                          xmlns='http://www.w3.org/2000/svg'
+                          viewBox='0 0 24 24'
+                          fill='none'
+                          stroke='currentColor'
+                          strokeWidth={1.5}
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          className='h-4 w-4'
+                        >
+                          <path d='M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' />
+                        </svg>
+                      </span>
+                      {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className='flex w-full items-center px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    role='menuitem'
+                  >
+                    <span className='mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-900 dark:text-red-200'>
+                      <svg
+                        xmlns='http://www.w3.org/2000/svg'
+                        fill='none'
+                        viewBox='0 0 24 24'
+                        strokeWidth={1.5}
+                        stroke='currentColor'
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        className='h-4 w-4'
+                      >
+                        <path d='M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15' />
+                        <path d='M12 9l3 3m0 0l-3 3m3-3H3' />
+                      </svg>
+                    </span>
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className='flex items-center md:hidden'>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+              className='inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
             >
-              <svg className="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                className='h-6 w-6'
+                stroke='currentColor'
+                fill='none'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth='2'
+                  d='M4 6h16M4 12h16M4 18h16'
+                />
               </svg>
             </button>
           </div>
@@ -86,47 +261,70 @@ const Navigation: React.FC = () => {
 
       {/* Mobile menu */}
       {isMenuOpen && (
-        <div className="md:hidden">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+        <div className='md:hidden'>
+          <div className='space-y-1 px-2 pt-2 pb-3 sm:px-3'>
             {navigation.map((item) => (
               <button
                 key={item.name}
                 onClick={() => {
-                  router.push(item.href)
-                  setIsMenuOpen(false)
+                  router.push(item.href);
+                  setIsMenuOpen(false);
                 }}
-                className={`${
+                className={`block w-full border-l-4 py-2 pl-3 pr-4 text-left text-base font-medium ${
                   item.current
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700'
-                } block pl-3 pr-4 py-2 border-l-4 text-base font-medium w-full text-left`}
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-gray-800 dark:text-blue-200'
+                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                }`}
               >
                 {item.name}
                 {item.name === 'Cart' && cartTotal > 0 && (
-                  <span className="ml-2 bg-red-500 text-white rounded-full w-5 h-5 text-xs inline-flex items-center justify-center">
+                  <span className='ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white'>
                     {cartTotal}
                   </span>
                 )}
               </button>
             ))}
-            <div className="pt-4 pb-3 border-t border-gray-200">
-              <div className="flex items-center px-4">
-                <div className="text-base font-medium text-gray-800">{currentUser?.DisplayName}</div>
-                <div className="ml-auto">
-                  <button
-                    onClick={handleLogout}
-                    className="text-sm font-medium text-gray-500 hover:text-gray-700"
-                  >
-                    Logout
-                  </button>
+            <div className='border-t border-gray-200 pt-4 pb-3 dark:border-gray-700'>
+              <div className='px-4'>
+                <div className='text-base font-medium text-gray-800 dark:text-gray-200'>
+                  {currentUser?.DisplayName}
                 </div>
+              </div>
+              <div className='mt-3 space-y-1 px-2'>
+                <button
+                  onClick={() => {
+                    router.push('/settings');
+                    setIsMenuOpen(false);
+                  }}
+                  className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={() => {
+                    handleThemeToggle();
+                    setIsMenuOpen(false);
+                  }}
+                  className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                >
+                  {isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                </button>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMenuOpen(false);
+                  }}
+                  className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                >
+                  Logout
+                </button>
               </div>
             </div>
           </div>
         </div>
       )}
     </nav>
-  )
-}
+  );
+};
 
-export default Navigation
+export default Navigation;

@@ -789,16 +789,37 @@ export default function HomeDetailPage({ params }: PageProps) {
         ),
         cell: ({ row }) => {
           const isEditing = editingPartRowId === row.index && editingPartDraft;
-          return isEditing ? (
-            <input
-              value={editingPartDraft.part}
-              onChange={(event) =>
-                handlePartDraftChange('part', event.target.value)
-              }
-              className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
-            />
-          ) : (
-            row.original.part || '—'
+          if (isEditing) {
+            return (
+              <input
+                value={editingPartDraft.part}
+                onChange={(event) =>
+                  handlePartDraftChange('part', event.target.value)
+                }
+                className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+              />
+            );
+          }
+
+          const { part, url } = row.original;
+          const partName = part?.trim();
+          if (!partName) {
+            return '-';
+          }
+
+          const href =
+            url?.trim() ||
+            `https://www.amazon.com/s?k=${encodeURIComponent(partName)}`;
+
+          return (
+            <a
+              href={href}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-sm font-medium text-blue-600 hover:text-blue-700'
+            >
+              {partName}
+            </a>
           );
         },
       },
@@ -876,7 +897,7 @@ export default function HomeDetailPage({ params }: PageProps) {
             onClick={column.getToggleSortingHandler()}
             className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
           >
-            Amazon
+            ASK AI
             <span className='text-gray-400'>
               {sortingIndicator(column.getIsSorted())}
             </span>
@@ -915,7 +936,7 @@ export default function HomeDetailPage({ params }: PageProps) {
               rel='noopener noreferrer'
               className='text-sm font-medium text-blue-600 hover:text-blue-700'
             >
-              View
+              About this Product
             </a>
           );
         },

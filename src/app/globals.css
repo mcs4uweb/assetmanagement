@@ -7,8 +7,16 @@
   color-scheme: light;
 }
 
+html.dark {
+  color-scheme: dark;
+}
+
 @layer base {
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+  }
+
+  html.dark body {
+    @apply bg-gray-900 text-gray-100;
   }
 }
