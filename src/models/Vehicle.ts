@@ -12,6 +12,7 @@ export interface Vehicle {
   purchaseDate?: Date
   parcelNumber?: string
   category?: string
+  description?: string
   videos?: Video[]
   odometer?: Odometer[]
   oilChange?: OilChange[]
@@ -33,7 +34,7 @@ export interface Odometer {
 }
 
 export interface OilChange {
-  date?: Date
+  date?: Date | string
   odometer?: number
 }
 
