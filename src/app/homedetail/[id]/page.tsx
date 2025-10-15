@@ -24,7 +24,7 @@ import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
 import { Vehicle, type Maintenance, type Part } from '../../../models/Vehicle';
-import { Check, Pencil, Plus } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
 
 interface PageProps {
   params: {
@@ -44,6 +44,17 @@ interface PartFormEntry {
   url: string;
   date: string;
 }
+
+interface GenerateDescriptionResponse {
+  result?: string;
+  attempts?: number;
+  maxAttempts?: number;
+  partial?: boolean;
+  error?: string;
+}
+
+const MAX_AI_GENERATION_ATTEMPTS = 3;
+const AI_RETRY_DELAY_MS = 800;
 
 export default function HomeDetailPage({ params }: PageProps) {
   const { id } = params;
@@ -93,6 +104,23 @@ export default function HomeDetailPage({ params }: PageProps) {
   const [isGeneratingAiDescription, setIsGeneratingAiDescription] =
     useState(false);
   const [aiDescriptionError, setAiDescriptionError] = useState<string | null>(
+    null
+  );
+  const [aiGenerationStats, setAiGenerationStats] = useState<{
+    attempts: number;
+    maxAttempts: number;
+  } | null>(null);
+  const [descriptionSourceOverride, setDescriptionSourceOverride] = useState<
+    string | null
+  >(null);
+  const [activeAiPartName, setActiveAiPartName] = useState<string | null>(null);
+  const [deleteModalMode, setDeleteModalMode] = useState<'asset' | 'part' | null>(
+    null
+  );
+  const [pendingPartDeleteIndex, setPendingPartDeleteIndex] = useState<number | null>(
+    null
+  );
+  const [pendingPartDeleteName, setPendingPartDeleteName] = useState<string | null>(
     null
   );
 
@@ -190,6 +218,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       setUpdatePartError(null);
       setSorting([]);
       setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
+      setPendingPartDeleteIndex(null);
+      setPendingPartDeleteName(null);
       return;
     }
 
@@ -217,6 +248,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     setIsUpdatingPart(false);
     setUpdatePartError(null);
     setIsDeleteModalOpen(false);
+    setDeleteModalMode(null);
+    setPendingPartDeleteIndex(null);
+    setPendingPartDeleteName(null);
   }, [asset]);
 
   const handleFieldChange = (
@@ -429,6 +463,7 @@ export default function HomeDetailPage({ params }: PageProps) {
   const openDeleteModal = () => {
     if (isDeleting) return;
     setErrorMessage(null);
+    setDeleteModalMode('asset');
     setIsDeleteModalOpen(true);
   };
 
@@ -441,6 +476,7 @@ export default function HomeDetailPage({ params }: PageProps) {
       const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
       await remove(targetRef);
       setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
       router.push('/home');
     } catch (error) {
       console.error('Failed to delete asset', error);
@@ -451,8 +487,16 @@ export default function HomeDetailPage({ params }: PageProps) {
   };
 
   const handleCancelDelete = () => {
-    if (isDeleting) return;
+    if (deleteModalMode === 'asset' && isDeleting) {
+      return;
+    }
+    if (deleteModalMode === 'part' && isUpdatingPart) {
+      return;
+    }
     setIsDeleteModalOpen(false);
+    setDeleteModalMode(null);
+    setPendingPartDeleteIndex(null);
+    setPendingPartDeleteName(null);
   };
 
   const handlePartFieldChange = (
@@ -466,6 +510,25 @@ export default function HomeDetailPage({ params }: PageProps) {
       return next;
     });
   };
+
+  const openPartDeleteModal = useCallback(
+    (index: number) => {
+      if (isUpdatingPart) return;
+      setUpdatePartError(null);
+
+      const targetPart = asset?.partNumber?.[index] ?? null;
+      const partLabel =
+        targetPart?.part?.trim() ||
+        targetPart?.type?.trim() ||
+        null;
+
+      setPendingPartDeleteIndex(index);
+      setPendingPartDeleteName(partLabel);
+      setDeleteModalMode('part');
+      setIsDeleteModalOpen(true);
+    },
+    [asset, isUpdatingPart]
+  );
 
   const handleAddPartEntry = () => {
     setIsEditingParts(true);
@@ -628,6 +691,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         }
 
         updatedParts[index] = {
+          ...updatedParts[index],
           part: trimmedPart || undefined,
           type: trimmedType || undefined,
           url: trimmedUrl || undefined,
@@ -667,8 +731,12 @@ export default function HomeDetailPage({ params }: PageProps) {
   }, [asset]);
 
   const descriptionSource = useMemo(() => {
+    const override = descriptionSourceOverride?.trim();
+    if (override) {
+      return override;
+    }
     if (!asset) return '';
-    debugger;
+
     if (typeof asset.description === 'string') {
       const trimmed = asset.description.trim();
       if (trimmed.length > 0) {
@@ -698,72 +766,234 @@ export default function HomeDetailPage({ params }: PageProps) {
     }
 
     return details.join('\n').trim();
-  }, [asset]);
+  }, [asset, descriptionSourceOverride]);
 
   const hasDescriptionPrompt = descriptionSource.length > 0;
 
   useEffect(() => {
     setAiDescription(null);
     setAiDescriptionError(null);
-    setIsGeneratingAiDescription(false);
+    setAiGenerationStats(null);
   }, [id, descriptionSource]);
 
-  const handleGenerateDetailedDescription = useCallback(async () => {
-    debugger;
-    if (!hasDescriptionPrompt || isGeneratingAiDescription) {
-      if (!hasDescriptionPrompt) {
+  useEffect(() => {
+    setDescriptionSourceOverride(null);
+    setActiveAiPartName(null);
+  }, [id]);
+
+  const generateAiDescription = useCallback(
+    async (prompt: string, emptyPromptError?: string) => {
+      const trimmedPrompt = prompt.trim();
+      if (!trimmedPrompt) {
         setAiDescriptionError(
-          'Add some asset details or a short description first.'
+          emptyPromptError ??
+            'Add some asset details or a short description first.'
         );
+        return;
       }
+      if (isGeneratingAiDescription) {
+        return;
+      }
+
+      setIsGeneratingAiDescription(true);
+      setAiDescriptionError(null);
+      setAiDescription(null);
+      setAiGenerationStats(null);
+
+      let lastError: string | null = null;
+
+      try {
+        for (
+          let attempt = 1;
+          attempt <= MAX_AI_GENERATION_ATTEMPTS;
+          attempt++
+        ) {
+          setAiGenerationStats({
+            attempts: attempt,
+            maxAttempts: MAX_AI_GENERATION_ATTEMPTS,
+          });
+
+          try {
+            const response = await fetch('/api/generate-description', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Client-Retry': '1',
+              },
+              body: JSON.stringify({ prompt: trimmedPrompt }),
+            });
+
+            const payload = (await response
+              .json()
+              .catch(() => null)) as GenerateDescriptionResponse | null;
+
+            if (!response.ok || !payload) {
+              lastError =
+                payload && typeof payload.error === 'string'
+                  ? payload.error
+                  : 'Unable to generate a detailed description right now.';
+            } else {
+              const text =
+                typeof payload.result === 'string'
+                  ? payload.result.trim()
+                  : '';
+
+              if (text) {
+                setAiDescription(text);
+
+                if (payload.partial) {
+                  setAiDescriptionError(
+                    'The AI response may be incomplete. Try refining the prompt.'
+                  );
+                } else {
+                  setAiDescriptionError(null);
+                }
+
+                return;
+              }
+
+              lastError =
+                payload && typeof payload.error === 'string'
+                  ? payload.error
+                  : 'The AI response did not include any content.';
+            }
+          } catch (error) {
+            console.error('Failed to generate AI description', error);
+            lastError =
+              'We could not reach Google Generative AI. Please try again later.';
+          }
+
+          if (attempt < MAX_AI_GENERATION_ATTEMPTS) {
+            await new Promise<void>((resolve) =>
+              setTimeout(resolve, AI_RETRY_DELAY_MS * attempt)
+            );
+          }
+        }
+
+        setAiDescriptionError(
+          lastError ??
+            'Unable to generate a detailed description right now.'
+        );
+      } finally {
+        setIsGeneratingAiDescription(false);
+      }
+    },
+    [isGeneratingAiDescription]
+  );
+
+  const handleGenerateDetailedDescription = useCallback(() => {
+    void generateAiDescription(
+      descriptionSource,
+      'Add some asset details or a short description first.'
+    );
+  }, [descriptionSource, generateAiDescription]);
+
+  const handleAskAiAboutPart = useCallback(
+    (part: Part) => {
+      const partName = part.part?.trim() ?? '';
+      const partType = part.type?.trim() ?? '';
+      const partDescription =
+        typeof part.description === 'string' ? part.description.trim() : '';
+
+      const promptSegments: string[] = [];
+
+      if (partDescription) {
+        promptSegments.push(partDescription);
+      }
+
+      if (partName) {
+        promptSegments.push(`Part Name: ${partName}`);
+      }
+
+      if (partType) {
+        promptSegments.push(`Part Type: ${partType}`);
+      }
+
+      const prompt = promptSegments.join('\n').trim();
+
+      if (prompt) {
+        setDescriptionSourceOverride(prompt);
+        setActiveAiPartName(partName || partType || null);
+        void generateAiDescription(
+          prompt,
+          'Add some details about this part before asking AI.'
+        );
+      } else {
+        setDescriptionSourceOverride(null);
+        setActiveAiPartName(null);
+        setAiDescription(null);
+        setAiDescriptionError('No details are available for this part yet.');
+      }
+    },
+    [generateAiDescription]
+  );
+
+  const handleDeletePart = useCallback(async () => {
+    if (
+      !asset ||
+      !currentUser ||
+      isUpdatingPart ||
+      pendingPartDeleteIndex === null
+    ) {
       return;
     }
 
-    setIsGeneratingAiDescription(true);
-    setAiDescriptionError(null);
-    setAiDescription(null);
+    const sourceParts = asset.partNumber ?? [];
+
+    if (!sourceParts[pendingPartDeleteIndex]) {
+      setUpdatePartError(
+        'Unable to locate this part. Please refresh and try again.'
+      );
+      setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
+      setPendingPartDeleteIndex(null);
+      setPendingPartDeleteName(null);
+      return;
+    }
+
+    setIsUpdatingPart(true);
+    setUpdatePartError(null);
 
     try {
-      const response = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: descriptionSource }),
+      const updatedParts = sourceParts.filter(
+        (_, partIndex) => partIndex !== pendingPartDeleteIndex
+      );
+      const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+
+      await set(targetRef, {
+        ...asset,
+        partNumber: updatedParts.length > 0 ? updatedParts : undefined,
       });
 
-      const payload = (await response.json().catch(() => null)) as {
-        result?: string;
-        error?: string;
-      } | null;
-
-      if (!response.ok || !payload) {
-        const message =
-          payload && typeof payload.error === 'string'
-            ? payload.error
-            : 'Unable to generate a detailed description right now.';
-        setAiDescriptionError(message);
-        return;
+      if (editingPartRowId === pendingPartDeleteIndex) {
+        setEditingPartRowId(null);
+        setEditingPartDraft(null);
       }
 
-      const text =
-        typeof payload.result === 'string' ? payload.result.trim() : '';
-
-      if (!text) {
-        setAiDescriptionError('The AI response did not include any content.');
-        return;
-      }
-
-      setAiDescription(text);
+      setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
+      setPendingPartDeleteIndex(null);
+      setPendingPartDeleteName(null);
     } catch (error) {
-      console.error('Failed to generate AI description', error);
-      setAiDescriptionError(
-        'We could not reach Google Generative AI. Please try again later.'
-      );
+      console.error('Failed to delete part', error);
+      setUpdatePartError('Unable to delete this part. Please try again.');
     } finally {
-      setIsGeneratingAiDescription(false);
+      setIsUpdatingPart(false);
     }
-  }, [descriptionSource, hasDescriptionPrompt, isGeneratingAiDescription]);
+  }, [
+    asset,
+    currentUser,
+    editingPartRowId,
+    id,
+    isUpdatingPart,
+    pendingPartDeleteIndex,
+  ]);
+
+  const handleResetDescriptionOverride = useCallback(() => {
+    setDescriptionSourceOverride(null);
+    setActiveAiPartName(null);
+    setAiGenerationStats(null);
+  }, []);
 
   const partColumns = useMemo<ColumnDef<Part>[]>(() => {
     const sortingIndicator = (direction: 'asc' | 'desc' | false) => {
@@ -895,7 +1125,7 @@ export default function HomeDetailPage({ params }: PageProps) {
           <button
             type='button'
             onClick={column.getToggleSortingHandler()}
-            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+            className='mx-auto flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
           >
             ASK AI
             <span className='text-gray-400'>
@@ -907,47 +1137,58 @@ export default function HomeDetailPage({ params }: PageProps) {
           const isEditing = editingPartRowId === row.index && editingPartDraft;
           if (isEditing) {
             return (
-              <input
-                value={editingPartDraft.url}
-                onChange={(event) =>
-                  handlePartDraftChange('url', event.target.value)
-                }
-                className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
-                placeholder='https://'
-              />
+              <div className='flex justify-center'>
+                <input
+                  value={editingPartDraft.url}
+                  onChange={(event) =>
+                    handlePartDraftChange('url', event.target.value)
+                  }
+                  className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+                  placeholder='https://'
+                />
+              </div>
             );
           }
 
-          const { url, part } = row.original;
-          const href =
-            url ||
-            (part
-              ? `https://www.amazon.com/s?k=${encodeURIComponent(part)}`
-              : '');
+          const { part, type, description } = row.original;
+          const hasAskAiDetails = Boolean(
+            (part && part.trim()) ||
+              (type && type.trim()) ||
+              (typeof description === 'string' && description.trim())
+          );
 
-          if (!href) {
-            return <span className='text-gray-400'>—</span>;
+          if (!hasAskAiDetails) {
+            return (
+              <div className='flex justify-center'>
+                <span className='text-gray-400'>-</span>
+              </div>
+            );
           }
 
           return (
-            <a
-              href={href}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-sm font-medium text-blue-600 hover:text-blue-700'
-            >
-              About this Product
-            </a>
+            <div className='flex justify-center'>
+              <button
+                type='button'
+                onClick={() => handleAskAiAboutPart(row.original)}
+                className='text-sm font-medium text-blue-600 hover:text-blue-700 focus:outline-none'
+              >
+                About this Product
+              </button>
+            </div>
           );
         },
       },
       {
         id: 'actions',
-        header: 'Action',
+        header: () => (
+          <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Action
+          </div>
+        ),
         cell: ({ row }) => {
           const isEditing = editingPartRowId === row.index && editingPartDraft;
           return (
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center justify-center gap-2'>
               <button
                 type='button'
                 onClick={() =>
@@ -970,6 +1211,15 @@ export default function HomeDetailPage({ params }: PageProps) {
               >
                 <Check className='h-4 w-4' />
               </button>
+              <button
+                type='button'
+                onClick={() => openPartDeleteModal(row.index)}
+                className='rounded-full border border-red-400 bg-red-50 p-1 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50'
+                aria-label='Delete part'
+                disabled={isUpdatingPart}
+              >
+                <Trash2 className='h-4 w-4' />
+              </button>
             </div>
           );
         },
@@ -983,6 +1233,8 @@ export default function HomeDetailPage({ params }: PageProps) {
     cancelEditingPart,
     startEditingPart,
     saveEditingPart,
+    handleAskAiAboutPart,
+    openPartDeleteModal,
   ]);
 
   const partData = useMemo<Part[]>(() => asset?.partNumber ?? [], [asset]);
@@ -1234,52 +1486,6 @@ export default function HomeDetailPage({ params }: PageProps) {
                         </p>
                       )}
 
-                      <div className='space-y-3'>
-                        <div className='flex items-center justify-between'>
-                          <h3 className='text-sm font-semibold text-gray-900'>
-                            Description
-                          </h3>
-                          <button
-                            type='button'
-                            onClick={handleGenerateDetailedDescription}
-                            className='text-sm font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-blue-300'
-                            disabled={
-                              isGeneratingAiDescription || !hasDescriptionPrompt
-                            }
-                          >
-                            {isGeneratingAiDescription
-                              ? 'Generating description...'
-                              : 'Ask AI for a detailed description'}
-                          </button>
-                        </div>
-                        {hasDescriptionPrompt ? (
-                          asset?.description ? (
-                            <p className='text-sm text-gray-600 whitespace-pre-line'>
-                              {asset.description}
-                            </p>
-                          ) : (
-                            <p className='text-sm text-gray-500'>
-                              We&apos;ll use the overview details above to ask
-                              AI for more context.
-                            </p>
-                          )
-                        ) : (
-                          <p className='text-sm text-gray-500'>
-                            Add basic information about this asset to enable AI
-                            suggestions.
-                          </p>
-                        )}
-                        {aiDescriptionError && (
-                          <p className='text-sm text-red-600'>
-                            {aiDescriptionError}
-                          </p>
-                        )}
-                        {aiDescription && (
-                          <div className='rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 whitespace-pre-line'>
-                            {aiDescription}
-                          </div>
-                        )}
-                      </div>
                     </div>
                   )}
                 </section>
@@ -1614,6 +1820,83 @@ export default function HomeDetailPage({ params }: PageProps) {
                 </section>
 
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+                  <div className='flex flex-wrap items-center justify-between gap-3'>
+                    <h2 className='text-xl font-semibold text-gray-900'>
+                      AI Description
+                    </h2>
+                    <div className='flex items-center gap-3'>
+                      {descriptionSourceOverride && (
+                        <button
+                          type='button'
+                          onClick={handleResetDescriptionOverride}
+                          className='text-xs font-medium text-gray-500 hover:text-gray-700'
+                        >
+                          Use asset overview
+                        </button>
+                      )}
+                      <button
+                        type='button'
+                        onClick={handleGenerateDetailedDescription}
+                        className='text-sm font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-blue-300'
+                        disabled={isGeneratingAiDescription || !hasDescriptionPrompt}
+                      >
+                        {isGeneratingAiDescription
+                          ? 'Generating description...'
+                          : descriptionSourceOverride
+                            ? 'Ask AI about this part'
+                            : 'Ask AI for a detailed description'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className='mt-4 space-y-3'>
+                    {hasDescriptionPrompt ? (
+                      descriptionSourceOverride ? (
+                        <div className='space-y-1 text-sm text-gray-600'>
+                          {activeAiPartName && (
+                            <p className='font-medium text-gray-900'>
+                              {activeAiPartName}
+                            </p>
+                          )}
+                          <p className='whitespace-pre-line'>
+                            {descriptionSource}
+                          </p>
+                        </div>
+                      ) : asset?.description ? (
+                        <p className='text-sm text-gray-600 whitespace-pre-line'>
+                          {asset.description}
+                        </p>
+                      ) : (
+                        <p className='text-sm text-gray-500'>
+                          We&apos;ll use the overview details above to ask AI for
+                          more context.
+                        </p>
+                      )
+                    ) : (
+                      <p className='text-sm text-gray-500'>
+                        Add basic information about this asset to enable AI
+                        suggestions.
+                      </p>
+                    )}
+                    {aiDescriptionError && (
+                      <p className='text-sm text-red-600'>
+                        {aiDescriptionError}
+                      </p>
+                    )}
+                    {aiGenerationStats && (
+                      <p className='text-xs text-gray-500'>
+                        AI attempts used: {aiGenerationStats.attempts} of{' '}
+                        {aiGenerationStats.maxAttempts}
+                      </p>
+                    )}
+                    {aiDescription && (
+                      <div className='rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 whitespace-pre-line'>
+                        {aiDescription}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
                   <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold text-gray-900'>
                       Parts to Order
@@ -1843,35 +2126,56 @@ export default function HomeDetailPage({ params }: PageProps) {
           className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 px-4'
           role='dialog'
           aria-modal='true'
-          aria-labelledby='delete-asset-title'
+          aria-labelledby='delete-modal-title'
         >
           <div className='w-full max-w-md rounded-lg bg-white p-6 shadow-xl'>
             <h2
-              id='delete-asset-title'
+              id='delete-modal-title'
               className='text-lg font-semibold text-gray-900'
             >
-              Delete asset?
+              {deleteModalMode === 'part' ? 'Delete part?' : 'Delete asset?'}
             </h2>
             <p className='mt-2 text-sm text-gray-600'>
-              Are you sure you want to delete this asset? This action cannot be
-              undone.
+              {deleteModalMode === 'part'
+                ? `Are you sure you want to delete ${
+                    pendingPartDeleteName
+                      ? `"${pendingPartDeleteName}"`
+                      : 'this part'
+                  }? This action cannot be undone.`
+                : 'Are you sure you want to delete this asset? This action cannot be undone.'}
             </p>
             <div className='mt-6 flex justify-end gap-3'>
               <button
                 type='button'
                 onClick={handleCancelDelete}
-                disabled={isDeleting}
+                disabled={
+                  deleteModalMode === 'part' ? isUpdatingPart : isDeleting
+                }
                 className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
               >
                 Cancel
               </button>
               <button
                 type='button'
-                onClick={handleDeleteAsset}
-                disabled={isDeleting}
+                onClick={
+                  deleteModalMode === 'part'
+                    ? () => {
+                        void handleDeletePart();
+                      }
+                    : handleDeleteAsset
+                }
+                disabled={
+                  deleteModalMode === 'part' ? isUpdatingPart : isDeleting
+                }
                 className='inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50'
               >
-                {isDeleting ? 'Deleting...' : 'Delete Asset'}
+                {deleteModalMode === 'part'
+                  ? isUpdatingPart
+                    ? 'Deleting...'
+                    : 'Delete Part'
+                  : isDeleting
+                  ? 'Deleting...'
+                  : 'Delete Asset'}
               </button>
             </div>
           </div>

@@ -43,6 +43,7 @@ export interface Part {
   type?: string
   url?: string
   date?: Date | string
+  description?: string
 }
 
 export interface Tool {
