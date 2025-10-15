@@ -12,7 +12,13 @@ const SettingsPage: React.FC = () => {
   const { currentUser, loading } = useAuth();
   const [proAiEnabled, setProAiEnabled] = useState(false);
   const [cloudBackupEnabled, setCloudBackupEnabled] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const TEAM_LIMIT = 2;
 
   useEffect(() => {
     if (!loading && !currentUser) {
@@ -31,6 +37,9 @@ const SettingsPage: React.FC = () => {
         const parsed = JSON.parse(savedSettings);
         setProAiEnabled(Boolean(parsed.proAiEnabled));
         setCloudBackupEnabled(Boolean(parsed.cloudBackupEnabled));
+        if (Array.isArray(parsed.teamMembers)) {
+          setTeamMembers(parsed.teamMembers);
+        }
       }
     } catch (error) {
       console.error('Unable to load settings from localStorage', error);
@@ -47,6 +56,7 @@ const SettingsPage: React.FC = () => {
     const settings = {
       proAiEnabled,
       cloudBackupEnabled,
+      teamMembers,
     };
 
     try {
@@ -55,6 +65,55 @@ const SettingsPage: React.FC = () => {
       console.error('Unable to save settings to localStorage', error);
     }
   }, [proAiEnabled, cloudBackupEnabled, preferencesLoaded]);
+
+  const isFreeTierLimitReached = teamMembers.length >= TEAM_LIMIT;
+
+  const handleInviteSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setInviteFeedback(null);
+    setInviteError(null);
+
+    if (isFreeTierLimitReached) {
+      setInviteError(
+        'Free tier reaches its limit with 2 members. Go Pro to add more teammates.'
+      );
+      return;
+    }
+
+    const trimmedEmail = inviteEmail.trim().toLowerCase();
+    if (!trimmedEmail) {
+      setInviteError('Please enter an email to invite.');
+      return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmedEmail)) {
+      setInviteError('Enter a valid email address.');
+      return;
+    }
+
+    if (teamMembers.includes(trimmedEmail)) {
+      setInviteError('This teammate has already been invited.');
+      return;
+    }
+
+    const updatedMembers = [...teamMembers, trimmedEmail];
+    setTeamMembers(updatedMembers);
+    setInviteFeedback(
+      `Invite sent to ${trimmedEmail}. Message: "Welcome to my Asset Management Group."`
+    );
+    setInviteEmail('');
+  };
+
+  const handleAiToggleClick = () => {
+    setProAiEnabled((value) => !value);
+    setIsProModalOpen(true);
+  };
+
+  const handleCloudToggleClick = () => {
+    setCloudBackupEnabled((value) => !value);
+    setIsProModalOpen(true);
+  };
 
   if (loading || !currentUser) {
     return (
@@ -117,7 +176,7 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <button
                   type='button'
-                  onClick={() => setProAiEnabled((value) => !value)}
+                  onClick={handleAiToggleClick}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     proAiEnabled ? 'bg-blue-600' : 'bg-gray-200'
                   }`}
@@ -153,7 +212,7 @@ const SettingsPage: React.FC = () => {
                 </div>
                 <button
                   type='button'
-                  onClick={() => setCloudBackupEnabled((value) => !value)}
+                  onClick={handleCloudToggleClick}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     cloudBackupEnabled ? 'bg-blue-600' : 'bg-gray-200'
                   }`}
@@ -171,12 +230,142 @@ const SettingsPage: React.FC = () => {
             </div>
           </section>
 
+          <section className='mt-8 rounded-2xl bg-white shadow-sm ring-1 ring-gray-100'>
+            <div className='border-b border-gray-100 px-6 py-5'>
+              <h2 className='text-lg font-semibold text-gray-900'>
+                Team Collaboration
+              </h2>
+              <p className='mt-1 text-sm text-gray-500'>
+                Invite teammates to manage assets with you. Free tier supports up
+                to {TEAM_LIMIT} members. Go Pro anytime to unlock more seats.
+              </p>
+            </div>
+
+            <div className='px-6 py-6'>
+              <div className='mb-6'>
+                <h3 className='text-sm font-semibold uppercase tracking-wide text-gray-500'>
+                  Current Members ({teamMembers.length}/{TEAM_LIMIT} Free)
+                </h3>
+                {teamMembers.length === 0 ? (
+                  <p className='mt-2 text-sm text-gray-500'>
+                    You haven&apos;t invited anyone yet. Add up to two teammates on
+                    this plan.
+                  </p>
+                ) : (
+                  <ul className='mt-3 space-y-2'>
+                    {teamMembers.map((member) => (
+                      <li
+                        key={member}
+                        className='rounded-md border border-gray-100 bg-gray-50 px-4 py-2 text-sm text-gray-700'
+                      >
+                        {member}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <form onSubmit={handleInviteSubmit} className='space-y-4'>
+                <div>
+                  <label
+                    htmlFor='invite-email'
+                    className='block text-sm font-medium text-gray-700'
+                  >
+                    Invite by email
+                  </label>
+                  <input
+                    id='invite-email'
+                    type='email'
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                    placeholder='teammate@email.com'
+                    className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+                  />
+                </div>
+
+                {inviteError && (
+                  <p className='text-sm text-red-600'>{inviteError}</p>
+                )}
+                {inviteFeedback && (
+                  <p className='text-sm text-green-600'>{inviteFeedback}</p>
+                )}
+
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+                  <button
+                    type='submit'
+                    disabled={isFreeTierLimitReached}
+                    className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-white shadow-sm transition ${
+                      isFreeTierLimitReached
+                        ? 'cursor-not-allowed bg-gray-300'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
+                  >
+                    Add User
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => setIsProModalOpen(true)}
+                    className='inline-flex items-center justify-center rounded-md border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50'
+                  >
+                    Go Pro
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+
           <p className='mt-8 text-sm text-gray-500'>
             These previews help us tailor the Pro roadmap. We&apos;ll notify you
             the moment these upgrades go live in your workspace.
           </p>
         </div>
       </div>
+
+      {isProModalOpen && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4'>
+          <div className='w-full max-w-lg rounded-lg bg-white p-8 shadow-xl'>
+            <div className='mb-6 text-center'>
+              <h2 className='text-2xl font-bold text-gray-900'>
+                Unlock Pro Features
+              </h2>
+              <p className='mt-3 text-gray-600'>
+                Go Pro to leverage the full power of AI for ultimate asset
+                management efficiency.
+              </p>
+            </div>
+            <ul className='space-y-3 text-gray-700'>
+              <li>
+                <strong>AI Auto-Tagging</strong> from images/receipts.
+              </li>
+              <li>
+                <strong>Proactive Maintenance</strong> schedules.
+              </li>
+              <li>
+                <strong>Financial Depreciation</strong> narrative reports.
+              </li>
+            </ul>
+            <div className='mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
+              <button
+                type='button'
+                onClick={() => setIsProModalOpen(false)}
+                className='rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100'
+              >
+                Not Now
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setIsProModalOpen(false);
+                  router.push('/asset-manager-pro');
+                }}
+                className='rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700'
+              >
+                Upgrade to Pro Now!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

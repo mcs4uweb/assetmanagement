@@ -83,6 +83,11 @@ const Navigation: React.FC = () => {
 
   const navigation = [
     { name: 'My Assets', href: '/home', current: pathname === '/home' },
+    {
+      name: 'Asset Manager Pro',
+      href: '/asset-manager-pro',
+      current: pathname === '/asset-manager-pro',
+    },
     { name: 'Cart', href: '/cart', current: pathname === '/cart' },
     { name: 'My Orders', href: '/myorders', current: pathname === '/myorders' },
     { name: 'Settings', href: '/settings', current: pathname === '/settings' },
