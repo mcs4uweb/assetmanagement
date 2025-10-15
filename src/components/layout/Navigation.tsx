@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -96,10 +97,13 @@ const Navigation: React.FC = () => {
       <div className='mx-auto max-w-7xl px-4'>
         <div className='flex h-16 justify-between'>
           <div className='flex items-center'>
-            <div className='flex items-center flex-shrink-0'>
-              <h1 className='text-xl font-bold text-blue-600 dark:text-blue-400'>
+            <div className='flex flex-shrink-0 items-center'>
+              <Link
+                href='/'
+                className='text-xl font-bold text-blue-600 transition hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300'
+              >
                 Asset Tracker
-              </h1>
+              </Link>
             </div>
 
             <div className='hidden md:ml-6 md:flex md:space-x-4'>

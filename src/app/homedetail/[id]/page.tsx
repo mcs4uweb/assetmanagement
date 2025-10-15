@@ -114,15 +114,15 @@ export default function HomeDetailPage({ params }: PageProps) {
     string | null
   >(null);
   const [activeAiPartName, setActiveAiPartName] = useState<string | null>(null);
-  const [deleteModalMode, setDeleteModalMode] = useState<'asset' | 'part' | null>(
-    null
-  );
-  const [pendingPartDeleteIndex, setPendingPartDeleteIndex] = useState<number | null>(
-    null
-  );
-  const [pendingPartDeleteName, setPendingPartDeleteName] = useState<string | null>(
-    null
-  );
+  const [deleteModalMode, setDeleteModalMode] = useState<
+    'asset' | 'part' | null
+  >(null);
+  const [pendingPartDeleteIndex, setPendingPartDeleteIndex] = useState<
+    number | null
+  >(null);
+  const [pendingPartDeleteName, setPendingPartDeleteName] = useState<
+    string | null
+  >(null);
 
   const buildQuickInfoFormState = (targetAsset: Vehicle | null) => {
     const latestOdometer =
@@ -518,9 +518,7 @@ export default function HomeDetailPage({ params }: PageProps) {
 
       const targetPart = asset?.partNumber?.[index] ?? null;
       const partLabel =
-        targetPart?.part?.trim() ||
-        targetPart?.type?.trim() ||
-        null;
+        targetPart?.part?.trim() || targetPart?.type?.trim() || null;
 
       setPendingPartDeleteIndex(index);
       setPendingPartDeleteName(partLabel);
@@ -834,9 +832,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                   : 'Unable to generate a detailed description right now.';
             } else {
               const text =
-                typeof payload.result === 'string'
-                  ? payload.result.trim()
-                  : '';
+                typeof payload.result === 'string' ? payload.result.trim() : '';
 
               if (text) {
                 setAiDescription(text);
@@ -871,8 +867,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         }
 
         setAiDescriptionError(
-          lastError ??
-            'Unable to generate a detailed description right now.'
+          lastError ?? 'Unable to generate a detailed description right now.'
         );
       } finally {
         setIsGeneratingAiDescription(false);
@@ -1026,7 +1021,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                 onChange={(event) =>
                   handlePartDraftChange('part', event.target.value)
                 }
-                className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
               />
             );
           }
@@ -1075,7 +1070,7 @@ export default function HomeDetailPage({ params }: PageProps) {
               onChange={(event) =>
                 handlePartDraftChange('type', event.target.value)
               }
-              className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+              className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
             />
           ) : (
             row.original.type || '—'
@@ -1106,7 +1101,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                 onChange={(event) =>
                   handlePartDraftChange('date', event.target.value)
                 }
-                className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
               />
             );
           }
@@ -1143,7 +1138,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                   onChange={(event) =>
                     handlePartDraftChange('url', event.target.value)
                   }
-                  className='w-full rounded-md border border-gray-300 px-2 py-1 text-sm'
+                  className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
                   placeholder='https://'
                 />
               </div>
@@ -1288,7 +1283,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     <>
       <Layout>
         <div className='bg-gray-50 min-h-screen py-10'>
-          <div className='mx-auto max-w-4xl px-4 sm:px-6 lg:px-8'>
+          <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8'>
             <div className='mb-6 flex items-center justify-between'>
               <div>
                 <h1 className='mt-2 text-3xl font-semibold text-gray-900'>
@@ -1346,7 +1341,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             name='make'
                             value={formState.make}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                             required
                           />
                         </div>
@@ -1362,7 +1357,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             name='model'
                             value={formState.model}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                             required
                           />
                         </div>
@@ -1379,7 +1374,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             type='number'
                             value={formState.year}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
                         <div>
@@ -1394,7 +1389,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             name='vin'
                             value={formState.vin}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
                         <div>
@@ -1409,7 +1404,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             name='plate'
                             value={formState.plate}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
                         <div>
@@ -1424,7 +1419,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                             name='tires'
                             value={formState.tires}
                             onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
                       </div>
@@ -1485,7 +1480,6 @@ export default function HomeDetailPage({ params }: PageProps) {
                           This asset doesn&apos;t have additional details yet.
                         </p>
                       )}
-
                     </div>
                   )}
                 </section>
@@ -1528,7 +1522,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                           name='category'
                           value={quickInfoFormState.category}
                           onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                         />
                       </div>
                       <div>
@@ -1544,7 +1538,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                           type='number'
                           value={quickInfoFormState.odometer}
                           onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           placeholder='Enter latest reading'
                         />
                       </div>
@@ -1561,7 +1555,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                           type='date'
                           value={quickInfoFormState.oilChangeDate}
                           onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                         />
                       </div>
                       <div className='flex items-center gap-3'>
@@ -1682,7 +1676,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
                             <div>
@@ -1702,7 +1696,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                                 rows={3}
                               />
                             </div>
@@ -1724,7 +1718,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
                             <div className='flex justify-end'>
@@ -1824,29 +1818,6 @@ export default function HomeDetailPage({ params }: PageProps) {
                     <h2 className='text-xl font-semibold text-gray-900'>
                       AI Description
                     </h2>
-                    <div className='flex items-center gap-3'>
-                      {descriptionSourceOverride && (
-                        <button
-                          type='button'
-                          onClick={handleResetDescriptionOverride}
-                          className='text-xs font-medium text-gray-500 hover:text-gray-700'
-                        >
-                          Use asset overview
-                        </button>
-                      )}
-                      <button
-                        type='button'
-                        onClick={handleGenerateDetailedDescription}
-                        className='text-sm font-medium text-blue-600 hover:underline disabled:cursor-not-allowed disabled:text-blue-300'
-                        disabled={isGeneratingAiDescription || !hasDescriptionPrompt}
-                      >
-                        {isGeneratingAiDescription
-                          ? 'Generating description...'
-                          : descriptionSourceOverride
-                            ? 'Ask AI about this part'
-                            : 'Ask AI for a detailed description'}
-                      </button>
-                    </div>
                   </div>
                   <div className='mt-4 space-y-3'>
                     {hasDescriptionPrompt ? (
@@ -1867,8 +1838,8 @@ export default function HomeDetailPage({ params }: PageProps) {
                         </p>
                       ) : (
                         <p className='text-sm text-gray-500'>
-                          We&apos;ll use the overview details above to ask AI for
-                          more context.
+                          We&apos;ll use the overview details above to ask AI
+                          for more context.
                         </p>
                       )
                     ) : (
@@ -1948,7 +1919,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
                             <div>
@@ -1968,7 +1939,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
                             <div>
@@ -1988,7 +1959,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                                 placeholder='https://'
                               />
                             </div>
@@ -2010,7 +1981,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     event.target.value
                                   )
                                 }
-                                className='mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm'
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
                             <div className='flex justify-end'>

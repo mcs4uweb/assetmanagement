@@ -33,7 +33,6 @@ export default function HomePage() {
     }
 
     const assetsRef = ref(db, `assets/${currentUser.UserId}`);
-    debugger;
     const unsubscribe = onValue(assetsRef, (snapshot: any) => {
       const data = snapshot.val();
       if (data) {
@@ -65,7 +64,6 @@ export default function HomePage() {
 
     try {
       const assetsRef = ref(db, `assets/${currentUser.UserId}`);
-      debugger;
       const newAssetRef = push(assetsRef);
       const newAsset: Vehicle = {
         ...formData,
@@ -217,7 +215,7 @@ export default function HomePage() {
                     }));
                   }
                 }}
-                className='w-full p-2 border border-gray-300 rounded mb-4'
+                className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
               >
                 <option value=''>Select Asset Type</option>
                 <option value='vehicle'>Vehicle</option>
@@ -237,7 +235,7 @@ export default function HomePage() {
                       value={formData.make}
                       onChange={handleInputChange}
                       required
-                      className='mt-1 block w-full border border-gray-300 rounded-md px-3 py-2'
+                      className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
                     />
                   </div>
                   <div>
@@ -250,7 +248,7 @@ export default function HomePage() {
                       value={formData.model}
                       onChange={handleInputChange}
                       required
-                      className='mt-1 block w-full border border-gray-300 rounded-md px-3 py-2'
+                      className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
                     />
                   </div>
                   <div>
@@ -262,7 +260,7 @@ export default function HomePage() {
                       name='year'
                       value={formData.year}
                       onChange={handleInputChange}
-                      className='mt-1 block w-full border border-gray-300 rounded-md px-3 py-2'
+                      className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
                     />
                   </div>
                   {selectedAsset !== 'bike' && (
@@ -275,7 +273,7 @@ export default function HomePage() {
                         name='vin'
                         value={formData.vin}
                         onChange={handleInputChange}
-                        className='mt-1 block w-full border border-gray-300 rounded-md px-3 py-2'
+                        className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
                       />
                     </div>
                   )}
