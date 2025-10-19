@@ -24,7 +24,7 @@ import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
 import { Vehicle, type Maintenance, type Part } from '../../../models/Vehicle';
-import { Check, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 interface PageProps {
   params: {
@@ -53,6 +53,28 @@ interface GenerateDescriptionResponse {
   error?: string;
 }
 
+interface QuickInfoRow {
+  id: string;
+  event: string;
+  reading: string;
+  date: string;
+  source: 'odometer' | 'oilChange';
+  sourceIndex: number;
+  rawReading: number | null;
+  rawDate: string;
+}
+
+type OverviewDetailColumn = 'primary' | 'secondary';
+
+interface OverviewDetailEntry {
+  label: string;
+  value: string;
+  column: OverviewDetailColumn;
+  alwaysShow?: boolean;
+  placeholder?: string;
+  displayValue?: string;
+}
+
 const MAX_AI_GENERATION_ATTEMPTS = 3;
 const AI_RETRY_DELAY_MS = 800;
 
@@ -72,16 +94,31 @@ export default function HomeDetailPage({ params }: PageProps) {
     vin: '',
     plate: '',
     tires: '',
+    tireSize: '',
+    tirePressure: '',
+    oilType: '',
     category: '',
   });
-  const [isEditingQuickInfo, setIsEditingQuickInfo] = useState(false);
-  const [isSavingQuickInfo, setIsSavingQuickInfo] = useState(false);
   const [quickInfoError, setQuickInfoError] = useState<string | null>(null);
-  const [quickInfoFormState, setQuickInfoFormState] = useState({
-    category: '',
-    odometer: '',
-    oilChangeDate: '',
+  const [editingQuickInfoRowId, setEditingQuickInfoRowId] = useState<
+    string | null
+  >(null);
+  const [quickInfoRowDraft, setQuickInfoRowDraft] = useState({
+    reading: '',
+    date: '',
   });
+  const [isSavingQuickInfoRow, setIsSavingQuickInfoRow] = useState(false);
+  const [isQuickInfoAddMenuOpen, setIsQuickInfoAddMenuOpen] = useState(false);
+  const [quickInfoAddType, setQuickInfoAddType] = useState<
+    'odometer' | 'oilChange' | null
+  >(null);
+  const [quickInfoAddForm, setQuickInfoAddForm] = useState({
+    reading: '',
+    date: '',
+  });
+  const [isSavingQuickInfoAddition, setIsSavingQuickInfoAddition] =
+    useState(false);
+  const [isDeletingQuickInfoRow, setIsDeletingQuickInfoRow] = useState(false);
   const [isEditingMaintenance, setIsEditingMaintenance] = useState(false);
   const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState<string | null>(null);
@@ -99,7 +136,8 @@ export default function HomeDetailPage({ params }: PageProps) {
     useState<PartFormEntry | null>(null);
   const [isUpdatingPart, setIsUpdatingPart] = useState(false);
   const [updatePartError, setUpdatePartError] = useState<string | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [partSorting, setPartSorting] = useState<SortingState>([]);
+  const [quickInfoSorting, setQuickInfoSorting] = useState<SortingState>([]);
   const [aiDescription, setAiDescription] = useState<string | null>(null);
   const [isGeneratingAiDescription, setIsGeneratingAiDescription] =
     useState(false);
@@ -115,7 +153,7 @@ export default function HomeDetailPage({ params }: PageProps) {
   >(null);
   const [activeAiPartName, setActiveAiPartName] = useState<string | null>(null);
   const [deleteModalMode, setDeleteModalMode] = useState<
-    'asset' | 'part' | null
+    'asset' | 'part' | 'quickInfo' | null
   >(null);
   const [pendingPartDeleteIndex, setPendingPartDeleteIndex] = useState<
     number | null
@@ -123,30 +161,8 @@ export default function HomeDetailPage({ params }: PageProps) {
   const [pendingPartDeleteName, setPendingPartDeleteName] = useState<
     string | null
   >(null);
-
-  const buildQuickInfoFormState = (targetAsset: Vehicle | null) => {
-    const latestOdometer =
-      targetAsset?.odometer && targetAsset.odometer.length > 0
-        ? targetAsset.odometer[targetAsset.odometer.length - 1]?.odometer
-        : undefined;
-    const latestOilChange =
-      targetAsset?.oilChange && targetAsset.oilChange.length > 0
-        ? targetAsset.oilChange[targetAsset.oilChange.length - 1]?.date
-        : undefined;
-    const oilChangeDate =
-      latestOilChange && !Number.isNaN(new Date(latestOilChange).getTime())
-        ? new Date(latestOilChange).toISOString().split('T')[0]
-        : '';
-
-    return {
-      category: targetAsset?.category ?? '',
-      odometer:
-        latestOdometer !== undefined && latestOdometer !== null
-          ? String(latestOdometer)
-          : '',
-      oilChangeDate,
-    };
-  };
+  const [pendingQuickInfoDeleteRow, setPendingQuickInfoDeleteRow] =
+    useState<QuickInfoRow | null>(null);
 
   const buildMaintenanceFormState = (
     targetAsset: Vehicle | null
@@ -193,21 +209,30 @@ export default function HomeDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     if (!asset) {
-      setFormState({
-        make: '',
-        model: '',
-        year: '',
-        vin: '',
-        plate: '',
-        tires: '',
-        category: '',
-      });
-      setQuickInfoFormState(buildQuickInfoFormState(null));
+    setFormState({
+      make: '',
+      model: '',
+      year: '',
+      vin: '',
+      plate: '',
+      tires: '',
+      tireSize: '',
+      tirePressure: '',
+      oilType: '',
+      category: '',
+    });
       setMaintenanceFormState([]);
-      setIsEditingQuickInfo(false);
+      setEditingQuickInfoRowId(null);
+      setQuickInfoRowDraft({ reading: '', date: '' });
+      setIsSavingQuickInfoRow(false);
       setIsEditingMaintenance(false);
       setIsEditingParts(false);
       setQuickInfoError(null);
+      setIsQuickInfoAddMenuOpen(false);
+      setQuickInfoAddType(null);
+      setQuickInfoAddForm({ reading: '', date: '' });
+      setIsSavingQuickInfoAddition(false);
+      setIsDeletingQuickInfoRow(false);
       setMaintenanceError(null);
       setIsDeleting(false);
       setPartFormState([]);
@@ -216,11 +241,13 @@ export default function HomeDetailPage({ params }: PageProps) {
       setEditingPartDraft(null);
       setIsUpdatingPart(false);
       setUpdatePartError(null);
-      setSorting([]);
+      setPartSorting([]);
+      setQuickInfoSorting([]);
       setIsDeleteModalOpen(false);
       setDeleteModalMode(null);
       setPendingPartDeleteIndex(null);
       setPendingPartDeleteName(null);
+      setPendingQuickInfoDeleteRow(null);
       return;
     }
 
@@ -231,14 +258,23 @@ export default function HomeDetailPage({ params }: PageProps) {
       vin: asset.vin ?? '',
       plate: asset.plate ?? '',
       tires: asset.tires ?? '',
+      tireSize: asset.tireSize ?? '',
+      tirePressure: asset.tirePressure ?? '',
+      oilType: asset.oilType ?? '',
       category: asset.category ?? '',
     });
-    setQuickInfoFormState(buildQuickInfoFormState(asset));
     setMaintenanceFormState(buildMaintenanceFormState(asset));
-    setIsEditingQuickInfo(false);
+    setEditingQuickInfoRowId(null);
+    setQuickInfoRowDraft({ reading: '', date: '' });
+    setIsSavingQuickInfoRow(false);
     setIsEditingMaintenance(false);
     setIsEditingParts(false);
     setQuickInfoError(null);
+    setIsQuickInfoAddMenuOpen(false);
+    setQuickInfoAddType(null);
+    setQuickInfoAddForm({ reading: '', date: '' });
+    setIsSavingQuickInfoAddition(false);
+    setIsDeletingQuickInfoRow(false);
     setMaintenanceError(null);
     setIsDeleting(false);
     setPartFormState([]);
@@ -251,6 +287,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     setDeleteModalMode(null);
     setPendingPartDeleteIndex(null);
     setPendingPartDeleteName(null);
+    setPendingQuickInfoDeleteRow(null);
   }, [asset]);
 
   const handleFieldChange = (
@@ -278,6 +315,9 @@ export default function HomeDetailPage({ params }: PageProps) {
         vin: formState.vin.trim(),
         plate: formState.plate.trim(),
         tires: formState.tires.trim(),
+        tireSize: formState.tireSize.trim(),
+        tirePressure: formState.tirePressure.trim(),
+        oilType: formState.oilType.trim(),
         category: formState.category.trim(),
       };
 
@@ -288,99 +328,6 @@ export default function HomeDetailPage({ params }: PageProps) {
       setErrorMessage('Unable to save changes. Please try again.');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleQuickInfoFieldChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = event.target;
-    setQuickInfoFormState((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleQuickInfoSave = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!currentUser || !asset) return;
-
-    const trimmedCategory = quickInfoFormState.category.trim();
-    const odometerValue = quickInfoFormState.odometer.trim();
-    const oilChangeDateValue = quickInfoFormState.oilChangeDate.trim();
-
-    if (odometerValue && Number.isNaN(Number(odometerValue))) {
-      setQuickInfoError('Odometer must be a valid number.');
-      return;
-    }
-
-    let normalizedOilChangeDate: string | undefined;
-    if (oilChangeDateValue) {
-      const parsedDate = new Date(oilChangeDateValue);
-      if (Number.isNaN(parsedDate.getTime())) {
-        setQuickInfoError('Please provide a valid oil change date.');
-        return;
-      }
-      normalizedOilChangeDate = parsedDate.toISOString();
-    }
-
-    setIsSavingQuickInfo(true);
-    setQuickInfoError(null);
-
-    try {
-      const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
-
-      const odometerEntries = [...(asset.odometer ?? [])];
-      if (odometerValue) {
-        const numericOdometer = Number(odometerValue);
-        if (odometerEntries.length > 0) {
-          const lastIndex = odometerEntries.length - 1;
-          odometerEntries[lastIndex] = {
-            ...odometerEntries[lastIndex],
-            odometer: numericOdometer,
-          };
-        } else {
-          odometerEntries.push({
-            odometer: numericOdometer,
-          });
-        }
-      }
-
-      const oilChangeEntries = [...(asset.oilChange ?? [])];
-      if (normalizedOilChangeDate) {
-        if (oilChangeEntries.length > 0) {
-          const lastIndex = oilChangeEntries.length - 1;
-          oilChangeEntries[lastIndex] = {
-            ...oilChangeEntries[lastIndex],
-            date: normalizedOilChangeDate,
-          };
-        } else {
-          oilChangeEntries.push({
-            date: normalizedOilChangeDate,
-          });
-        }
-      }
-
-      const updatedAsset: Vehicle & Record<string, unknown> = {
-        ...asset,
-        odometer: odometerEntries,
-        oilChange: oilChangeEntries,
-      };
-
-      if (trimmedCategory) {
-        updatedAsset.category = trimmedCategory;
-      } else {
-        delete updatedAsset.category;
-      }
-
-      const sanitizedAsset = JSON.parse(
-        JSON.stringify(updatedAsset)
-      ) as Vehicle;
-
-      await set(targetRef, sanitizedAsset);
-      setAsset(sanitizedAsset);
-      setQuickInfoFormState(buildQuickInfoFormState(sanitizedAsset));
-      setIsEditingQuickInfo(false);
-    } catch (error) {
-      console.error('Failed to update quick info', error);
-      setQuickInfoError('Unable to save quick info changes. Please try again.');
-    } finally {
-      setIsSavingQuickInfo(false);
     }
   };
 
@@ -493,10 +440,14 @@ export default function HomeDetailPage({ params }: PageProps) {
     if (deleteModalMode === 'part' && isUpdatingPart) {
       return;
     }
+    if (deleteModalMode === 'quickInfo' && isDeletingQuickInfoRow) {
+      return;
+    }
     setIsDeleteModalOpen(false);
     setDeleteModalMode(null);
     setPendingPartDeleteIndex(null);
     setPendingPartDeleteName(null);
+    setPendingQuickInfoDeleteRow(null);
   };
 
   const handlePartFieldChange = (
@@ -714,19 +665,834 @@ export default function HomeDetailPage({ params }: PageProps) {
     [asset, currentUser, editingPartDraft, editingPartRowId, id]
   );
 
-  const detailEntries = useMemo(() => {
+  const handleDeleteQuickInfoRow = useCallback(
+    async (row: QuickInfoRow) => {
+      if (!asset || !currentUser || isDeletingQuickInfoRow) {
+        return;
+      }
+
+      setIsDeletingQuickInfoRow(true);
+      setQuickInfoError(null);
+
+      try {
+        const odometerEntries = [...(asset.odometer ?? [])];
+        const oilChangeEntries = [...(asset.oilChange ?? [])];
+
+        if (row.source === 'odometer') {
+          if (!odometerEntries[row.sourceIndex]) {
+            setQuickInfoError(
+              'Unable to locate this odometer record. Please refresh and try again.'
+            );
+            setIsDeletingQuickInfoRow(false);
+            return;
+          }
+          odometerEntries.splice(row.sourceIndex, 1);
+        } else {
+          if (!oilChangeEntries[row.sourceIndex]) {
+            setQuickInfoError(
+              'Unable to locate this oil change record. Please refresh and try again.'
+            );
+            setIsDeletingQuickInfoRow(false);
+            return;
+          }
+          oilChangeEntries.splice(row.sourceIndex, 1);
+        }
+
+        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+        const updatedAsset: Vehicle & Record<string, unknown> = {
+          ...asset,
+          odometer: odometerEntries.length > 0 ? odometerEntries : undefined,
+          oilChange: oilChangeEntries.length > 0 ? oilChangeEntries : undefined,
+        };
+
+        const sanitizedAsset = JSON.parse(
+          JSON.stringify(updatedAsset)
+        ) as Vehicle;
+
+        await set(targetRef, sanitizedAsset);
+        setAsset(sanitizedAsset);
+        if (editingQuickInfoRowId === row.id) {
+          setEditingQuickInfoRowId(null);
+          setQuickInfoRowDraft({ reading: '', date: '' });
+        }
+        setPendingQuickInfoDeleteRow(null);
+        setDeleteModalMode(null);
+        setIsDeleteModalOpen(false);
+      } catch (error) {
+        console.error('Failed to delete quick info entry', error);
+        setQuickInfoError('Unable to delete this entry. Please try again.');
+      } finally {
+        setIsDeletingQuickInfoRow(false);
+      }
+    },
+    [
+      asset,
+      currentUser,
+      id,
+      isDeletingQuickInfoRow,
+      editingQuickInfoRowId,
+      setAsset,
+      setEditingQuickInfoRowId,
+      setQuickInfoRowDraft,
+      setQuickInfoError,
+    ]
+  );
+
+  const openQuickInfoAddForm = useCallback(
+    (type: 'odometer' | 'oilChange') => {
+      setQuickInfoError(null);
+      setQuickInfoAddForm({ reading: '', date: '' });
+      setQuickInfoAddType(type);
+      setIsQuickInfoAddMenuOpen(false);
+      setEditingQuickInfoRowId(null);
+      setQuickInfoRowDraft({ reading: '', date: '' });
+    },
+    []
+  );
+
+  const openQuickInfoDeleteModal = useCallback(
+    (row: QuickInfoRow) => {
+      if (isDeletingQuickInfoRow) return;
+      setQuickInfoError(null);
+      setQuickInfoAddType(null);
+      setQuickInfoAddForm({ reading: '', date: '' });
+      setIsQuickInfoAddMenuOpen(false);
+       if (editingQuickInfoRowId === row.id) {
+         setEditingQuickInfoRowId(null);
+         setQuickInfoRowDraft({ reading: '', date: '' });
+       }
+      setPendingQuickInfoDeleteRow(row);
+      setDeleteModalMode('quickInfo');
+      setIsDeleteModalOpen(true);
+    },
+    [editingQuickInfoRowId, isDeletingQuickInfoRow]
+  );
+
+  const handleQuickInfoAddFieldChange = useCallback(
+    (field: 'reading' | 'date', value: string) => {
+      setQuickInfoAddForm((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  const handleQuickInfoAddCancel = useCallback(() => {
+    if (isSavingQuickInfoAddition) return;
+    setQuickInfoAddType(null);
+    setQuickInfoAddForm({ reading: '', date: '' });
+    setQuickInfoError(null);
+    setIsQuickInfoAddMenuOpen(false);
+  }, [isSavingQuickInfoAddition]);
+
+  const handleQuickInfoAddSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!asset || !currentUser || !quickInfoAddType) {
+        return;
+      }
+
+      const trimmedReading = quickInfoAddForm.reading.trim();
+      const trimmedDate = quickInfoAddForm.date.trim();
+
+      if (!trimmedDate) {
+        setQuickInfoError('Please provide a date for this entry.');
+        return;
+      }
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+        setQuickInfoError('Please provide a valid date.');
+        return;
+      }
+      const parsedTimestamp = Date.parse(`${trimmedDate}T00:00:00Z`);
+      if (Number.isNaN(parsedTimestamp)) {
+        setQuickInfoError('Please provide a valid date.');
+        return;
+      }
+      const isoDate = `${trimmedDate}T00:00:00.000Z`;
+
+      let numericReading: number | undefined;
+      if (trimmedReading) {
+        const numeric = Number(trimmedReading);
+        if (Number.isNaN(numeric)) {
+          setQuickInfoError('Odometer reading must be a valid number.');
+          return;
+        }
+        numericReading = numeric;
+      }
+
+      if (quickInfoAddType === 'odometer' && numericReading === undefined) {
+        setQuickInfoError('Odometer reading is required for this entry.');
+        return;
+      }
+
+      setIsSavingQuickInfoAddition(true);
+      setQuickInfoError(null);
+
+      try {
+        const odometerEntries = [...(asset.odometer ?? [])];
+        const oilChangeEntries = [...(asset.oilChange ?? [])];
+
+        if (quickInfoAddType === 'odometer') {
+          odometerEntries.push({
+            odometer: numericReading,
+            date: isoDate,
+          });
+        } else {
+          oilChangeEntries.push({
+            date: isoDate,
+            odometer: numericReading,
+          });
+        }
+
+        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+        const updatedAsset: Vehicle & Record<string, unknown> = {
+          ...asset,
+          odometer: odometerEntries.length > 0 ? odometerEntries : undefined,
+          oilChange: oilChangeEntries.length > 0 ? oilChangeEntries : undefined,
+        };
+
+        const sanitizedAsset = JSON.parse(
+          JSON.stringify(updatedAsset)
+        ) as Vehicle;
+
+        await set(targetRef, sanitizedAsset);
+        setAsset(sanitizedAsset);
+        setQuickInfoAddType(null);
+        setQuickInfoAddForm({ reading: '', date: '' });
+      } catch (error) {
+        console.error('Failed to add quick info entry', error);
+        setQuickInfoError('Unable to add this entry. Please try again.');
+      } finally {
+        setIsSavingQuickInfoAddition(false);
+      }
+    },
+    [
+      asset,
+      currentUser,
+      id,
+      quickInfoAddForm.date,
+      quickInfoAddForm.reading,
+      quickInfoAddType,
+    ]
+  );
+
+  const startEditingQuickInfoRow = useCallback(
+    (row: QuickInfoRow) => {
+      if (isSavingQuickInfoRow || isDeletingQuickInfoRow) {
+        return;
+      }
+      setQuickInfoError(null);
+      setEditingQuickInfoRowId(row.id);
+      setQuickInfoRowDraft({
+        reading: row.rawReading !== null ? String(row.rawReading) : '',
+        date: row.rawDate,
+      });
+      setQuickInfoAddType(null);
+      setQuickInfoAddForm({ reading: '', date: '' });
+      setIsQuickInfoAddMenuOpen(false);
+    },
+    [isDeletingQuickInfoRow, isSavingQuickInfoRow]
+  );
+
+  const cancelEditingQuickInfoRow = useCallback(() => {
+    if (isSavingQuickInfoRow) return;
+    setEditingQuickInfoRowId(null);
+    setQuickInfoRowDraft({ reading: '', date: '' });
+    setQuickInfoError(null);
+  }, [isSavingQuickInfoRow]);
+
+  const handleQuickInfoRowDraftChange = useCallback(
+    (field: 'reading' | 'date', value: string) => {
+      setQuickInfoRowDraft((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
+
+  const saveQuickInfoRow = useCallback(
+    async (row: QuickInfoRow) => {
+      if (
+        !asset ||
+        !currentUser ||
+        editingQuickInfoRowId !== row.id ||
+        isSavingQuickInfoRow
+      ) {
+        return;
+      }
+
+      const trimmedReading = quickInfoRowDraft.reading.trim();
+      const trimmedDate = quickInfoRowDraft.date.trim();
+
+      if (!trimmedDate) {
+        setQuickInfoError('Please provide a date for this entry.');
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
+        setQuickInfoError('Please provide a valid date.');
+        return;
+      }
+      const parsedTimestamp = Date.parse(`${trimmedDate}T00:00:00Z`);
+      if (Number.isNaN(parsedTimestamp)) {
+        setQuickInfoError('Please provide a valid date.');
+        return;
+      }
+      const isoDate = `${trimmedDate}T00:00:00.000Z`;
+
+      let numericReading: number | undefined;
+      if (trimmedReading) {
+        const numeric = Number(trimmedReading);
+        if (Number.isNaN(numeric)) {
+          setQuickInfoError('Odometer reading must be a valid number.');
+          return;
+        }
+        numericReading = numeric;
+      }
+
+      if (row.source === 'odometer' && numericReading === undefined) {
+        setQuickInfoError('Odometer reading is required for this entry.');
+        return;
+      }
+
+      setIsSavingQuickInfoRow(true);
+      setQuickInfoError(null);
+
+      try {
+        const odometerEntries = [...(asset.odometer ?? [])];
+        const oilChangeEntries = [...(asset.oilChange ?? [])];
+
+        if (row.source === 'odometer') {
+          if (!odometerEntries[row.sourceIndex]) {
+            setQuickInfoError(
+              'Unable to locate this odometer record. Please refresh and try again.'
+            );
+            return;
+          }
+          const nextEntry: Record<string, unknown> = {
+            ...odometerEntries[row.sourceIndex],
+          };
+          nextEntry.odometer = numericReading;
+          nextEntry.date = isoDate;
+          odometerEntries[row.sourceIndex] = nextEntry;
+        } else {
+          if (!oilChangeEntries[row.sourceIndex]) {
+            setQuickInfoError(
+              'Unable to locate this oil change record. Please refresh and try again.'
+            );
+            return;
+          }
+          const nextEntry: Record<string, unknown> = {
+            ...oilChangeEntries[row.sourceIndex],
+          };
+          nextEntry.date = isoDate;
+          if (numericReading !== undefined) {
+            nextEntry.odometer = numericReading;
+          } else {
+            delete nextEntry.odometer;
+          }
+          oilChangeEntries[row.sourceIndex] = nextEntry;
+        }
+
+        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+        const updatedAsset: Vehicle & Record<string, unknown> = {
+          ...asset,
+          odometer: odometerEntries.length > 0 ? odometerEntries : undefined,
+          oilChange: oilChangeEntries.length > 0 ? oilChangeEntries : undefined,
+        };
+
+        const sanitizedAsset = JSON.parse(
+          JSON.stringify(updatedAsset)
+        ) as Vehicle;
+
+        await set(targetRef, sanitizedAsset);
+        setAsset(sanitizedAsset);
+        setEditingQuickInfoRowId(null);
+        setQuickInfoRowDraft({ reading: '', date: '' });
+      } catch (error) {
+        console.error('Failed to update quick info entry', error);
+        setQuickInfoError('Unable to save this entry. Please try again.');
+      } finally {
+        setIsSavingQuickInfoRow(false);
+      }
+    },
+    [
+      asset,
+      currentUser,
+      editingQuickInfoRowId,
+      id,
+      isSavingQuickInfoRow,
+      quickInfoRowDraft.date,
+      quickInfoRowDraft.reading,
+    ]
+  );
+
+  const numberFormatter = useMemo(() => new Intl.NumberFormat(), []);
+
+  const quickInfoVehicleLabel = useMemo(() => {
+    if (!asset) return 'Vehicle';
+
+    const parts = [asset.year, asset.make, asset.model]
+      .filter(
+        (value) =>
+          value !== undefined && value !== null && String(value).trim().length > 0
+      )
+      .map((value) => String(value).trim());
+
+    if (parts.length > 0) {
+      return parts.join(' ');
+    }
+
+    if (asset.vin && asset.vin.trim().length > 0) {
+      return asset.vin.trim();
+    }
+
+    return asset.category?.trim() || 'Vehicle';
+}, [asset]);
+
+  const headerModelYear = useMemo(() => {
+    if (!asset) return '';
+
+    const parts = [asset.model, asset.year]
+      .filter(
+        (value) =>
+          value !== undefined && value !== null && String(value).trim().length > 0
+      )
+      .map((value) => String(value).trim());
+
+    return parts.join(' / ');
+  }, [asset]);
+
+  const quickInfoRows = useMemo<QuickInfoRow[]>(() => {
     if (!asset) return [];
 
+    const formatReading = (value: unknown): string => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return numberFormatter.format(value);
+      }
+
+      if (
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        !Number.isNaN(Number(value))
+      ) {
+        return numberFormatter.format(Number(value));
+      }
+
+      return 'N/A';
+    };
+
+    const toInputDate = (input: unknown): string => {
+      if (input === null || input === undefined || input === '') {
+        return '';
+      }
+
+      if (typeof input === 'string') {
+        const match = input.match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+        if (match) {
+          return match[1];
+        }
+      }
+
+      const parsed =
+        input instanceof Date
+          ? input
+          : new Date(input as string | number);
+
+      if (Number.isNaN(parsed.getTime())) {
+        return '';
+      }
+
+      return parsed.toISOString().split('T')[0] ?? '';
+    };
+
+    const formatWithUtc = (date: Date) =>
+      new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        timeZone: 'UTC',
+      }).format(date);
+
+    const formatDate = (input: unknown): string => {
+      const inputDate = toInputDate(input);
+      if (!inputDate) {
+        return 'N/A';
+      }
+      const [year, month, day] = inputDate.split('-').map(Number);
+      if (
+        Number.isNaN(year) ||
+        Number.isNaN(month) ||
+        Number.isNaN(day)
+      ) {
+        return 'N/A';
+      }
+      return formatWithUtc(new Date(Date.UTC(year, month - 1, day)));
+    };
+
+    const resolveNumeric = (value: unknown): number | null => {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        !Number.isNaN(Number(value))
+      ) {
+        return Number(value);
+      }
+      return null;
+    };
+
+    const rows: QuickInfoRow[] = [];
+
+    (asset.odometer ?? []).forEach((entry, index) => {
+      const rawReading = resolveNumeric(entry.odometer);
+      const rawDate = toInputDate(entry.date ?? entry.reading);
+
+      rows.push({
+        id: `odometer-${index}`,
+        event: entry.type?.trim() || 'Odometer Reading',
+        reading: formatReading(entry.odometer),
+        date: formatDate(entry.date ?? entry.reading),
+        source: 'odometer',
+        sourceIndex: index,
+        rawReading,
+        rawDate,
+      });
+    });
+
+    (asset.oilChange ?? []).forEach((entry, index) => {
+      const rawReading = resolveNumeric(entry.odometer);
+      const rawDate = toInputDate(entry.date);
+
+      rows.push({
+        id: `oil-change-${index}`,
+        event: 'Oil Change',
+        reading: formatReading(entry.odometer),
+        date: formatDate(entry.date),
+        source: 'oilChange',
+        sourceIndex: index,
+        rawReading,
+        rawDate,
+      });
+    });
+
+    return rows;
+  }, [asset, numberFormatter]);
+
+  const quickInfoColumns = useMemo<ColumnDef<QuickInfoRow>[]>(() => {
+    const sortingIndicator = (direction: 'asc' | 'desc' | false) => {
+      if (direction === 'asc') return '^';
+      if (direction === 'desc') return 'v';
+      return '';
+    };
+
+    const formatNextActionDate = (inputRawDate: string): string => {
+      if (!inputRawDate) return 'N/A';
+      const parts = inputRawDate.split('-');
+      if (parts.length !== 3) return 'N/A';
+      const [yStr, mStr, dStr] = parts;
+      const y = Number(yStr);
+      const m = Number(mStr);
+      const d = Number(dStr);
+      if (
+        Number.isNaN(y) ||
+        Number.isNaN(m) ||
+        Number.isNaN(d)
+      ) {
+        return 'N/A';
+      }
+      const next = new Date(Date.UTC(y, m - 1 + 8, d));
+      return new Intl.DateTimeFormat(undefined, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        timeZone: 'UTC',
+      }).format(next);
+    };
+
+    const isNextActionDateOverdue = (inputRawDate: string): boolean => {
+      if (!inputRawDate) return false;
+      const parts = inputRawDate.split('-');
+      if (parts.length !== 3) return false;
+      const [yStr, mStr, dStr] = parts;
+      const y = Number(yStr);
+      const m = Number(mStr);
+      const d = Number(dStr);
+      if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return false;
+      const nextTs = Date.UTC(y, m - 1 + 8, d);
+      if (!Number.isFinite(nextTs)) return false;
+      const now = new Date();
+      const todayTs = Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate()
+      );
+      return todayTs > nextTs;
+    };
+
     return [
-      { label: 'Make', value: asset.make },
-      { label: 'Model', value: asset.model },
-      { label: 'Year', value: asset.year },
-      { label: 'VIN', value: asset.vin },
-      { label: 'Plate', value: asset.plate },
-      { label: 'Tires', value: asset.tires },
-      { label: 'Category', value: asset.category },
-    ].filter((entry) => entry.value !== undefined && entry.value !== '');
+      {
+        accessorKey: 'event',
+        header: ({ column }) => (
+          <button
+            type='button'
+            onClick={column.getToggleSortingHandler()}
+            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+          >
+            Event
+            <span className='text-gray-400'>
+              {sortingIndicator(column.getIsSorted())}
+            </span>
+          </button>
+        ),
+        cell: ({ row }) => (
+          <span className='text-sm font-medium text-gray-900'>
+            {row.original.event}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'reading',
+        header: ({ column }) => (
+          <button
+            type='button'
+            onClick={column.getToggleSortingHandler()}
+            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+          >
+            Reading
+            <span className='text-gray-400'>
+              {sortingIndicator(column.getIsSorted())}
+            </span>
+          </button>
+        ),
+        cell: ({ row }) => {
+          const isEditingRow = editingQuickInfoRowId === row.original.id;
+          if (isEditingRow) {
+            return (
+              <input
+                type='number'
+                step='any'
+                value={quickInfoRowDraft.reading}
+                onChange={(event) =>
+                  handleQuickInfoRowDraftChange('reading', event.target.value)
+                }
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
+                placeholder='Enter reading'
+              />
+            );
+          }
+          return (
+            <span className='text-sm text-gray-700'>{row.original.reading}</span>
+          );
+        },
+      },
+      {
+        accessorKey: 'date',
+        header: ({ column }) => (
+          <button
+            type='button'
+            onClick={column.getToggleSortingHandler()}
+            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+          >
+            Date
+            <span className='text-gray-400'>
+              {sortingIndicator(column.getIsSorted())}
+            </span>
+          </button>
+        ),
+        cell: ({ row }) => {
+          const isEditingRow = editingQuickInfoRowId === row.original.id;
+          if (isEditingRow) {
+            return (
+              <input
+                type='date'
+                value={quickInfoRowDraft.date}
+                onChange={(event) =>
+                  handleQuickInfoRowDraftChange('date', event.target.value)
+                }
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
+              />
+            );
+          }
+          return (
+            <span className='text-sm text-gray-700'>{row.original.date}</span>
+          );
+        },
+      },
+      {
+        id: 'nextActionDate',
+        enableSorting: false,
+        header: () => (
+          <span className='text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Action Date
+          </span>
+        ),
+        cell: ({ row }) => {
+          const isEditingRow = editingQuickInfoRowId === row.original.id;
+          const baseRaw = isEditingRow
+            ? quickInfoRowDraft.date
+            : row.original.rawDate;
+          const display = formatNextActionDate(baseRaw);
+          const overdue = isNextActionDateOverdue(baseRaw);
+          if (overdue && display !== 'N/A') {
+            return (
+              <span className='inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700'>
+                {display}
+              </span>
+            );
+          }
+          return <span className='text-sm text-gray-700'>{display}</span>;
+        },
+      },
+      {
+        id: 'actions',
+        header: () => (
+          <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Action
+          </div>
+        ),
+        cell: ({ row }) => {
+          const isEditingRow = editingQuickInfoRowId === row.original.id;
+          return (
+            <div className='flex items-center justify-center gap-2'>
+              {!isEditingRow && (
+                <button
+                  type='button'
+                  onClick={() => {
+                    setQuickInfoError(null);
+                    startEditingQuickInfoRow(row.original);
+                  }}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Edit quick info entry'
+                  disabled={isSavingQuickInfoRow || isDeletingQuickInfoRow}
+                >
+                  <Pencil className='h-4 w-4' />
+                </button>
+              )}
+              {isEditingRow && (
+                <button
+                  type='button'
+                  onClick={() => {
+                    setQuickInfoError(null);
+                    cancelEditingQuickInfoRow();
+                  }}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Cancel quick info edit'
+                  disabled={isSavingQuickInfoRow}
+                >
+                  <X className='h-4 w-4' />
+                </button>
+              )}
+              {isEditingRow && (
+                <button
+                  type='button'
+                  onClick={() => {
+                    setQuickInfoError(null);
+                    void saveQuickInfoRow(row.original);
+                  }}
+                  className='rounded-full border border-green-400 bg-green-50 p-1 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Save quick info entry'
+                  disabled={isSavingQuickInfoRow || isDeletingQuickInfoRow}
+                >
+                  <Check className='h-4 w-4' />
+                </button>
+              )}
+              <button
+                type='button'
+                onClick={() => {
+                  setQuickInfoError(null);
+                  openQuickInfoDeleteModal(row.original);
+                }}
+                className='rounded-full border border-red-400 bg-red-50 p-1 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50'
+                aria-label='Delete quick info entry'
+                disabled={isDeletingQuickInfoRow || isSavingQuickInfoRow}
+              >
+                <Trash2 className='h-4 w-4' />
+              </button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [
+    cancelEditingQuickInfoRow,
+    editingQuickInfoRowId,
+    handleQuickInfoRowDraftChange,
+    isDeletingQuickInfoRow,
+    isSavingQuickInfoRow,
+    openQuickInfoDeleteModal,
+    quickInfoRowDraft.date,
+    quickInfoRowDraft.reading,
+    saveQuickInfoRow,
+    startEditingQuickInfoRow,
+  ]);
+
+  const detailEntries = useMemo(() => {
+    if (!asset) {
+      return {
+        primary: [] as OverviewDetailEntry[],
+        secondary: [] as OverviewDetailEntry[],
+      };
+    }
+
+    const normalizeValue = (value: unknown): string => {
+      if (value === undefined || value === null) {
+        return '';
+      }
+      return String(value).trim();
+    };
+
+    const entries: OverviewDetailEntry[] = [
+      {
+        label: 'Tire Size',
+        value: normalizeValue(asset.tireSize),
+        column: 'primary',
+        placeholder: 'Not set',
+        alwaysShow: true,
+      },
+      {
+        label: 'Tire Pressure',
+        value: normalizeValue(asset.tirePressure),
+        column: 'primary',
+        placeholder: 'Not set',
+        alwaysShow: true,
+      },
+      {
+        label: 'Oil Type',
+        value: normalizeValue(asset.oilType),
+        column: 'primary',
+        placeholder: 'Not set',
+        alwaysShow: true,
+      },
+      {
+        label: 'VIN',
+        value: normalizeValue(asset.vin),
+        column: 'secondary',
+      },
+      {
+        label: 'Plate',
+        value: normalizeValue(asset.plate),
+        column: 'secondary',
+      },
+    ];
+
+    const filtered = entries
+      .filter((entry) => entry.alwaysShow || entry.value.length > 0)
+      .map<OverviewDetailEntry>((entry) => ({
+        ...entry,
+        displayValue:
+          entry.value.length > 0
+            ? entry.value
+            : entry.placeholder ?? 'Not set',
+      }));
+
+    return {
+      primary: filtered.filter((entry) => entry.column === 'primary'),
+      secondary: filtered.filter((entry) => entry.column === 'secondary'),
+    };
   }, [asset]);
+
+  const hasDetailEntries =
+    detailEntries.primary.length > 0 || detailEntries.secondary.length > 0;
+  const hasSecondaryDetailEntries = detailEntries.secondary.length > 0;
 
   const descriptionSource = useMemo(() => {
     const override = descriptionSourceOverride?.trim();
@@ -1184,28 +1950,39 @@ export default function HomeDetailPage({ params }: PageProps) {
           const isEditing = editingPartRowId === row.index && editingPartDraft;
           return (
             <div className='flex items-center justify-center gap-2'>
-              <button
-                type='button'
-                onClick={() =>
-                  isEditing
-                    ? cancelEditingPart()
-                    : startEditingPart(row.index, row.original)
-                }
-                className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100'
-                aria-label={isEditing ? 'Cancel edit' : 'Edit part'}
-                disabled={isUpdatingPart}
-              >
-                <Pencil className='h-4 w-4' />
-              </button>
-              <button
-                type='button'
-                onClick={() => saveEditingPart(row.index)}
-                className='rounded-full border border-green-400 bg-green-50 p-1 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
-                aria-label='Save part'
-                disabled={!isEditing || isUpdatingPart}
-              >
-                <Check className='h-4 w-4' />
-              </button>
+              {!isEditing && (
+                <button
+                  type='button'
+                  onClick={() => startEditingPart(row.index, row.original)}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100'
+                  aria-label='Edit part'
+                  disabled={isUpdatingPart}
+                >
+                  <Pencil className='h-4 w-4' />
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  type='button'
+                  onClick={cancelEditingPart}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Cancel edit'
+                  disabled={isUpdatingPart}
+                >
+                  <X className='h-4 w-4' />
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  type='button'
+                  onClick={() => saveEditingPart(row.index)}
+                  className='rounded-full border border-green-400 bg-green-50 p-1 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Save part'
+                  disabled={isUpdatingPart}
+                >
+                  <Check className='h-4 w-4' />
+                </button>
+              )}
               <button
                 type='button'
                 onClick={() => openPartDeleteModal(row.index)}
@@ -1234,16 +2011,81 @@ export default function HomeDetailPage({ params }: PageProps) {
 
   const partData = useMemo<Part[]>(() => asset?.partNumber ?? [], [asset]);
 
+  const quickInfoTable = useReactTable<QuickInfoRow>({
+    data: quickInfoRows,
+    columns: quickInfoColumns,
+    state: {
+      sorting: quickInfoSorting,
+    },
+    onSortingChange: setQuickInfoSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
   const partTable = useReactTable<Part>({
     data: partData,
     columns: partColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     state: {
-      sorting,
+      sorting: partSorting,
     },
-    onSortingChange: setSorting,
+    onSortingChange: setPartSorting,
   });
+
+  const isDeleteModalPart = deleteModalMode === 'part';
+  const isDeleteModalQuickInfo = deleteModalMode === 'quickInfo';
+  const quickInfoEntryLabel = pendingQuickInfoDeleteRow
+    ? `${pendingQuickInfoDeleteRow.event}${
+        pendingQuickInfoDeleteRow.date &&
+        pendingQuickInfoDeleteRow.date !== 'N/A'
+          ? ` (${pendingQuickInfoDeleteRow.date})`
+          : ''
+      }`
+    : 'this entry';
+  const deleteModalTitle = isDeleteModalPart
+    ? 'Delete part?'
+    : isDeleteModalQuickInfo
+    ? 'Delete entry?'
+    : 'Delete asset?';
+  const deleteModalMessage = isDeleteModalPart
+    ? `Are you sure you want to delete ${
+        pendingPartDeleteName
+          ? `"${pendingPartDeleteName}"`
+          : 'this part'
+      }? This action cannot be undone.`
+    : isDeleteModalQuickInfo
+    ? `Are you sure you want to delete ${quickInfoEntryLabel}? This action cannot be undone.`
+    : 'Are you sure you want to delete this asset? This action cannot be undone.';
+  const deleteModalInFlight = isDeleteModalPart
+    ? isUpdatingPart
+    : isDeleteModalQuickInfo
+    ? isDeletingQuickInfoRow
+    : isDeleting;
+  const deleteModalConfirmLabel = isDeleteModalPart
+    ? isUpdatingPart
+      ? 'Deleting...'
+      : 'Delete Part'
+    : isDeleteModalQuickInfo
+    ? isDeletingQuickInfoRow
+      ? 'Deleting...'
+      : 'Delete Entry'
+    : isDeleting
+    ? 'Deleting...'
+    : 'Delete Asset';
+  const handleDeleteConfirm = () => {
+    if (isDeleteModalPart) {
+      void handleDeletePart();
+      return;
+    }
+    if (isDeleteModalQuickInfo) {
+      if (pendingQuickInfoDeleteRow) {
+        void handleDeleteQuickInfoRow(pendingQuickInfoDeleteRow);
+      }
+      return;
+    }
+    void handleDeleteAsset();
+  };
 
   if (loading || isFetching) {
     return (
@@ -1289,13 +2131,26 @@ export default function HomeDetailPage({ params }: PageProps) {
                 <h1 className='mt-2 text-3xl font-semibold text-gray-900'>
                   {asset?.make || 'Asset Detail'}
                 </h1>
+                {headerModelYear && (
+                  <p className='mt-1 text-sm text-gray-600'>{headerModelYear}</p>
+                )}
               </div>
-              <Link
-                href='/home'
-                className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700'
-              >
-                Back to My Assets
-              </Link>
+              <div className='flex items-center gap-3'>
+                <Link
+                  href='/home'
+                  className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700'
+                >
+                  Back to My Assets
+                </Link>
+                <button
+                  type='button'
+                  onClick={openDeleteModal}
+                  disabled={isDeleting}
+                  className='inline-flex items-center rounded-md border border-red-400 bg-red-100 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Asset'}
+                </button>
+              </div>
             </div>
 
             {asset ? (
@@ -1315,68 +2170,12 @@ export default function HomeDetailPage({ params }: PageProps) {
                           Edit Asset
                         </button>
                       )}
-                      <button
-                        type='button'
-                        onClick={openDeleteModal}
-                        disabled={isDeleting}
-                        className='rounded-md border border-red-400 bg-red-100 px-3 py-1 text-sm font-medium text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50'
-                      >
-                        {isDeleting ? 'Deleting...' : 'Delete'}
-                      </button>
                     </div>
                   </div>
 
                   {isEditing ? (
                     <form onSubmit={handleSave} className='mt-6 space-y-4'>
                       <div className='grid gap-4 sm:grid-cols-2'>
-                        <div>
-                          <label
-                            htmlFor='make'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Make
-                          </label>
-                          <input
-                            id='make'
-                            name='make'
-                            value={formState.make}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor='model'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Model
-                          </label>
-                          <input
-                            id='model'
-                            name='model'
-                            value={formState.model}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor='year'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Year
-                          </label>
-                          <input
-                            id='year'
-                            name='year'
-                            type='number'
-                            value={formState.year}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                          />
-                        </div>
                         <div>
                           <label
                             htmlFor='vin'
@@ -1409,17 +2208,50 @@ export default function HomeDetailPage({ params }: PageProps) {
                         </div>
                         <div>
                           <label
-                            htmlFor='tires'
+                            htmlFor='tireSize'
                             className='block text-sm font-medium text-gray-700'
                           >
-                            Tires
+                            Tire Size
                           </label>
                           <input
-                            id='tires'
-                            name='tires'
-                            value={formState.tires}
+                            id='tireSize'
+                            name='tireSize'
+                            value={formState.tireSize}
                             onChange={handleFieldChange}
                             className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. 225/65R17'
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor='tirePressure'
+                            className='block text-sm font-medium text-gray-700'
+                          >
+                            Tire Pressure
+                          </label>
+                          <input
+                            id='tirePressure'
+                            name='tirePressure'
+                            value={formState.tirePressure}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. 35 PSI'
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor='oilType'
+                            className='block text-sm font-medium text-gray-700'
+                          >
+                            Oil Type
+                          </label>
+                          <input
+                            id='oilType'
+                            name='oilType'
+                            value={formState.oilType}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. 5W-30 Synthetic'
                           />
                         </div>
                       </div>
@@ -1448,6 +2280,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                               vin: asset.vin ?? '',
                               plate: asset.plate ?? '',
                               tires: asset.tires ?? '',
+                              tireSize: asset.tireSize ?? '',
+                              tirePressure: asset.tirePressure ?? '',
+                              oilType: asset.oilType ?? '',
                               category: asset.category ?? '',
                             });
                           }}
@@ -1459,21 +2294,46 @@ export default function HomeDetailPage({ params }: PageProps) {
                     </form>
                   ) : (
                     <div className='mt-6 space-y-6'>
-                      {detailEntries.length > 0 ? (
-                        <dl className='space-y-4'>
-                          {detailEntries.map((entry) => (
-                            <div
-                              key={entry.label}
-                              className='grid gap-2 sm:grid-cols-[140px,1fr]'
-                            >
-                              <dt className='text-sm font-medium text-gray-500'>
-                                {entry.label}
-                              </dt>
-                              <dd className='text-sm text-gray-900'>
-                                {entry.value}
-                              </dd>
+                      {hasDetailEntries ? (
+                        <dl
+                          className={`grid gap-6${
+                            hasSecondaryDetailEntries ? ' sm:grid-cols-2' : ''
+                          }`}
+                        >
+                          {detailEntries.primary.length > 0 && (
+                            <div className='space-y-4'>
+                              {detailEntries.primary.map((entry) => (
+                                <div
+                                  key={entry.label}
+                                  className='grid gap-2 sm:grid-cols-[140px,1fr]'
+                                >
+                                  <dt className='text-sm font-medium text-gray-500'>
+                                    {entry.label}
+                                  </dt>
+                                  <dd className='text-sm text-gray-900'>
+                                    {entry.displayValue ?? entry.value}
+                                  </dd>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          )}
+                          {hasSecondaryDetailEntries && (
+                            <div className='space-y-4'>
+                              {detailEntries.secondary.map((entry) => (
+                                <div
+                                  key={entry.label}
+                                  className='grid gap-2 sm:grid-cols-[140px,1fr]'
+                                >
+                                  <dt className='text-sm font-medium text-gray-500'>
+                                    {entry.label}
+                                  </dt>
+                                  <dd className='text-sm text-gray-900'>
+                                    {entry.displayValue ?? entry.value}
+                                  </dd>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </dl>
                       ) : (
                         <p className='text-sm text-gray-500'>
@@ -1484,136 +2344,200 @@ export default function HomeDetailPage({ params }: PageProps) {
                   )}
                 </section>
 
+                <div className='mb-4 rounded-md border-2 border-dotted border-red-400 p-4'>
+                  <h3 className='text-sm font-semibold text-red-700'>Notifier</h3>
+                </div>
+
                 <section className='rounded-lg border border-gray-200 bg-white p-4 shadow-sm'>
-                  <div className='flex items-center justify-between'>
-                    <h2 className='text-xl font-semibold text-gray-900'>
-                      Quick Info
-                    </h2>
-                    {!isEditingQuickInfo && (
+                  <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                    <div>
+                      <h2 className='text-xl font-semibold text-gray-900'>
+                        Quick Info
+                      </h2>
+                      <h3 className='text-sm font-semibold text-gray-600'>
+                        {quickInfoVehicleLabel}
+                      </h3>
+                    </div>
+                    <div className='flex items-center gap-2'>
                       <button
                         type='button'
                         onClick={() => {
-                          setIsEditingQuickInfo(true);
                           setQuickInfoError(null);
+                          setIsQuickInfoAddMenuOpen((prev) => !prev);
+                          setQuickInfoAddType(null);
+                          cancelEditingQuickInfoRow();
                         }}
-                        className='rounded-md border border-green-400 bg-green-100 px-3 py-1 text-sm font-medium text-green-700 transition hover:bg-green-200'
+                        className='rounded-full border border-blue-300 bg-blue-50 p-1 text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50'
+                        aria-label='Add quick info entry'
+                        disabled={isSavingQuickInfoRow || isDeletingQuickInfoRow}
                       >
-                        Edit
+                        <Plus className='h-4 w-4' />
                       </button>
-                    )}
+                    </div>
                   </div>
-                  {isEditingQuickInfo ? (
+                  {isQuickInfoAddMenuOpen && (
+                    <div className='mt-3 flex flex-wrap gap-2 text-xs sm:text-sm'>
+                      <button
+                        type='button'
+                        onClick={() => openQuickInfoAddForm('odometer')}
+                        className='rounded-md border border-gray-300 px-3 py-1 font-medium text-gray-700 transition hover:bg-gray-100'
+                      >
+                        Add Odometer Reading
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => openQuickInfoAddForm('oilChange')}
+                        className='rounded-md border border-gray-300 px-3 py-1 font-medium text-gray-700 transition hover:bg-gray-100'
+                      >
+                        Add Oil Change
+                      </button>
+                    </div>
+                  )}
+                  {quickInfoAddType && (
                     <form
-                      onSubmit={handleQuickInfoSave}
-                      className='mt-4 space-y-4'
+                      onSubmit={handleQuickInfoAddSubmit}
+                      className='mt-4 space-y-4 rounded-md border border-dashed border-blue-300 bg-blue-50/60 p-4 text-sm text-gray-700'
                     >
-                      {quickInfoError && (
-                        <p className='text-sm text-red-600'>{quickInfoError}</p>
-                      )}
-                      <div>
-                        <label
-                          htmlFor='quickInfoCategory'
-                          className='block text-sm font-medium text-gray-700'
-                        >
-                          Category
-                        </label>
-                        <input
-                          id='quickInfoCategory'
-                          name='category'
-                          value={quickInfoFormState.category}
-                          onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor='quickInfoOdometer'
-                          className='block text-sm font-medium text-gray-700'
-                        >
-                          Odometer
-                        </label>
-                        <input
-                          id='quickInfoOdometer'
-                          name='odometer'
-                          type='number'
-                          value={quickInfoFormState.odometer}
-                          onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                          placeholder='Enter latest reading'
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor='quickInfoOilChange'
-                          className='block text-sm font-medium text-gray-700'
-                        >
-                          Last Oil Change
-                        </label>
-                        <input
-                          id='quickInfoOilChange'
-                          name='oilChangeDate'
-                          type='date'
-                          value={quickInfoFormState.oilChangeDate}
-                          onChange={handleQuickInfoFieldChange}
-                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                        />
-                      </div>
-                      <div className='flex items-center gap-3'>
-                        <button
-                          type='submit'
-                          disabled={isSavingQuickInfo}
-                          className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
-                        >
-                          {isSavingQuickInfo ? 'Saving...' : 'Save Changes'}
-                        </button>
+                      <div className='flex items-center justify-between'>
+                        <h3 className='text-sm font-semibold text-blue-700'>
+                          {quickInfoAddType === 'odometer'
+                            ? 'Add Odometer Reading'
+                            : 'Add Oil Change'}
+                        </h3>
                         <button
                           type='button'
-                          onClick={() => {
-                            setIsEditingQuickInfo(false);
-                            setQuickInfoError(null);
-                            setQuickInfoFormState(
-                              buildQuickInfoFormState(asset)
-                            );
-                          }}
-                          className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100'
-                          disabled={isSavingQuickInfo}
+                          onClick={handleQuickInfoAddCancel}
+                          disabled={isSavingQuickInfoAddition}
+                          className='text-xs font-medium text-blue-600 transition hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
                         >
                           Cancel
                         </button>
                       </div>
+                      {quickInfoError && (
+                        <p className='text-sm text-red-600'>
+                          {quickInfoError}
+                        </p>
+                      )}
+                      <div className='grid gap-3 sm:grid-cols-2'>
+                        <div>
+                          <label
+                            htmlFor='quickInfoAddReading'
+                            className='block text-xs font-medium uppercase tracking-wide text-gray-700'
+                          >
+                            {quickInfoAddType === 'odometer'
+                              ? 'Odometer Reading'
+                              : 'Odometer (optional)'}
+                          </label>
+                          <input
+                            id='quickInfoAddReading'
+                            type='number'
+                            value={quickInfoAddForm.reading}
+                            onChange={(event) =>
+                              handleQuickInfoAddFieldChange(
+                                'reading',
+                                event.target.value
+                              )
+                            }
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder={
+                              quickInfoAddType === 'odometer'
+                                ? 'Enter mileage'
+                                : 'Mileage at oil change'
+                            }
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor='quickInfoAddDate'
+                            className='block text-xs font-medium uppercase tracking-wide text-gray-700'
+                          >
+                            Date
+                          </label>
+                          <input
+                            id='quickInfoAddDate'
+                            type='date'
+                            value={quickInfoAddForm.date}
+                            onChange={(event) =>
+                              handleQuickInfoAddFieldChange(
+                                'date',
+                                event.target.value
+                              )
+                            }
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                          />
+                        </div>
+                      </div>
+                      <div className='flex items-center gap-3 pt-2'>
+                        <button
+                          type='submit'
+                          disabled={isSavingQuickInfoAddition}
+                          className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+                        >
+                          {isSavingQuickInfoAddition ? 'Adding...' : 'Add Entry'}
+                        </button>
+                      </div>
                     </form>
-                  ) : (
-                    <dl className='mt-4 space-y-3 text-sm text-gray-700'>
-                      <div className='flex justify-between'>
-                        <dt>Category</dt>
-                        <dd className='font-medium text-gray-900'>
-                          {asset.category || 'Uncategorized'}
-                        </dd>
-                      </div>
-                      <div className='flex justify-between'>
-                        <dt>Odometer</dt>
-                        <dd>
-                          {asset.odometer && asset.odometer.length > 0
-                            ? `${
-                                asset.odometer[asset.odometer.length - 1]
-                                  ?.odometer ?? 'N/A'
-                              }`
-                            : 'N/A'}
-                        </dd>
-                      </div>
-                      <div className='flex justify-between'>
-                        <dt>Oil Change</dt>
-                        <dd>
-                          {asset.oilChange && asset.oilChange.length > 0
-                            ? new Date(
-                                asset.oilChange[asset.oilChange.length - 1]
-                                  ?.date ?? Date.now()
-                              ).toLocaleDateString()
-                            : 'N/A'}
-                        </dd>
-                      </div>
-                    </dl>
                   )}
+                  {!quickInfoAddType && quickInfoError && (
+                    <p className='mt-4 text-sm text-red-600'>{quickInfoError}</p>
+                  )}
+                  <div
+                    className={`mt-4 space-y-4 text-sm text-gray-700${
+                      quickInfoAddType
+                        ? ' border-t border-gray-200 pt-4'
+                        : ''
+                    }`}
+                  >
+                    {quickInfoRows.length > 0 ? (
+                      <div className='overflow-x-auto rounded-lg border border-gray-200'>
+                        <table className='min-w-full divide-y divide-gray-200 text-left'>
+                          <thead className='bg-gray-50'>
+                            {quickInfoTable.getHeaderGroups().map(
+                              (headerGroup) => (
+                                <tr key={headerGroup.id}>
+                                  {headerGroup.headers.map((header) => (
+                                    <th
+                                      key={header.id}
+                                      scope='col'
+                                      className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500'
+                                    >
+                                      {header.isPlaceholder
+                                        ? null
+                                        : flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext()
+                                          )}
+                                    </th>
+                                  ))}
+                                </tr>
+                              )
+                            )}
+                          </thead>
+                          <tbody className='divide-y divide-gray-200 bg-white'>
+                            {quickInfoTable.getRowModel().rows.map((row) => (
+                              <tr key={row.id} className='hover:bg-gray-50'>
+                                {row.getVisibleCells().map((cell) => (
+                                  <td
+                                    key={cell.id}
+                                    className='px-4 py-2 text-gray-700'
+                                  >
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className='text-sm text-gray-500'>
+                        No odometer or oil change records yet.
+                      </p>
+                    )}
+                  </div>
                 </section>
 
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
@@ -1870,7 +2794,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
                   <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold text-gray-900'>
-                      Parts to Order
+                      List of Parts
                     </h2>
                     <button
                       type='button'
@@ -1947,7 +2871,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 htmlFor={`part-url-${index}`}
                                 className='block text-sm font-medium text-gray-700'
                               >
-                                Amazon URL
+                                Vendor URL
                               </label>
                               <input
                                 id={`part-url-${index}`}
@@ -2104,49 +3028,27 @@ export default function HomeDetailPage({ params }: PageProps) {
               id='delete-modal-title'
               className='text-lg font-semibold text-gray-900'
             >
-              {deleteModalMode === 'part' ? 'Delete part?' : 'Delete asset?'}
+              {deleteModalTitle}
             </h2>
             <p className='mt-2 text-sm text-gray-600'>
-              {deleteModalMode === 'part'
-                ? `Are you sure you want to delete ${
-                    pendingPartDeleteName
-                      ? `"${pendingPartDeleteName}"`
-                      : 'this part'
-                  }? This action cannot be undone.`
-                : 'Are you sure you want to delete this asset? This action cannot be undone.'}
+              {deleteModalMessage}
             </p>
             <div className='mt-6 flex justify-end gap-3'>
               <button
                 type='button'
                 onClick={handleCancelDelete}
-                disabled={
-                  deleteModalMode === 'part' ? isUpdatingPart : isDeleting
-                }
+                disabled={deleteModalInFlight}
                 className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
               >
                 Cancel
               </button>
               <button
                 type='button'
-                onClick={
-                  deleteModalMode === 'part'
-                    ? () => {
-                        void handleDeletePart();
-                      }
-                    : handleDeleteAsset
-                }
-                disabled={
-                  deleteModalMode === 'part' ? isUpdatingPart : isDeleting
-                }
+                onClick={handleDeleteConfirm}
+                disabled={deleteModalInFlight}
                 className='inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50'
               >
-                {deleteModalMode === 'part'
-                  ? isUpdatingPart
-                    ? 'Deleting...'
-                    : 'Delete Part'
-                  : isDeleting
-                  ? 'Deleting...'
-                  : 'Delete Asset'}
+                {deleteModalConfirmLabel}
               </button>
             </div>
           </div>

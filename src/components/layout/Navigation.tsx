@@ -97,6 +97,9 @@ const Navigation: React.FC = () => {
     applyTheme(!isDarkMode);
   };
 
+  const userLabel =
+    currentUser?.DisplayName?.trim() || currentUser?.Email || '';
+
   return (
     <nav className='bg-white shadow-lg dark:bg-gray-900'>
       <div className='mx-auto max-w-7xl px-4'>
@@ -135,7 +138,7 @@ const Navigation: React.FC = () => {
 
           <div className='hidden items-center space-x-4 md:flex'>
             <span className='text-gray-700 dark:text-gray-200'>
-              {currentUser?.DisplayName}
+              {userLabel}
             </span>
             <div className='relative' ref={profileMenuRef}>
               <button
@@ -167,10 +170,10 @@ const Navigation: React.FC = () => {
                   className='absolute right-0 z-20 mt-2 w-48 rounded-lg border border-gray-100 bg-white py-2 shadow-lg ring-1 ring-black ring-opacity-5 dark:border-gray-700 dark:bg-gray-800'
                 >
                   <button
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      router.push('/settings');
-                    }}
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    router.push('/profile');
+                  }}
                     className='flex w-full items-center px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
                     role='menuitem'
                   >
@@ -296,15 +299,15 @@ const Navigation: React.FC = () => {
             <div className='border-t border-gray-200 pt-4 pb-3 dark:border-gray-700'>
               <div className='px-4'>
                 <div className='text-base font-medium text-gray-800 dark:text-gray-200'>
-                  {currentUser?.DisplayName}
+                  {userLabel}
                 </div>
               </div>
               <div className='mt-3 space-y-1 px-2'>
-                <button
-                  onClick={() => {
-                    router.push('/settings');
-                    setIsMenuOpen(false);
-                  }}
+              <button
+                onClick={() => {
+                  router.push('/profile');
+                  setIsMenuOpen(false);
+                }}
                   className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                 >
                   Profile

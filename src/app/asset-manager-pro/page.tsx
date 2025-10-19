@@ -21,6 +21,11 @@ const AssetManagerProPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
+  const [analysisStatus, setAnalysisStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !currentUser) {
@@ -45,7 +50,84 @@ const AssetManagerProPage: React.FC = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const readFileAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result !== 'string') {
+          reject(new Error('Unexpected file reader result.'));
+          return;
+        }
+
+        const commaIndex = result.indexOf(',');
+        if (commaIndex !== -1) {
+          resolve(result.slice(commaIndex + 1));
+        } else {
+          resolve(result);
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error('File read failed.'));
+      reader.readAsDataURL(file);
+    });
+
+  const analyzeImage = async (base64Image: string) => {
+    setAnalysisStatus('loading');
+    setAnalysisError(null);
+    setAnalysisResult(null);
+
+    try {
+      const response = await fetch('/api/image-recognition', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageBase64: base64Image,
+          prompt:
+            'Provide a concise, bullet-friendly summary of this asset image. Call out asset type, notable physical attributes, serial numbers, labels, and anything relevant for cataloging or maintenance follow-up.',
+        }),
+      });
+
+      if (!response.ok) {
+        let errorText = 'Image recognition request failed.';
+        try {
+          const payload = await response.json();
+          if (typeof payload?.error === 'string') {
+            errorText = payload.error;
+          }
+        } catch {
+          // ignore JSON parse error
+        }
+        throw new Error(errorText);
+      }
+
+      const payload = await response.json();
+      if (typeof payload?.result === 'string' && payload.result.trim()) {
+        setAnalysisResult(payload.result.trim());
+        setAnalysisStatus('success');
+      } else {
+        throw new Error('The AI response did not include any details.');
+      }
+    } catch (error) {
+      console.error('Image recognition failed:', error);
+      setAnalysisStatus('error');
+      const errorMessage =
+        error instanceof Error ? error.message : null;
+      const isFetchFailure =
+        typeof errorMessage === 'string' &&
+        errorMessage.toLowerCase().includes('fetch');
+      setAnalysisError(
+        isFetchFailure
+          ? 'Unable to reach the AI analysis service. Confirm your Ollama server is running and accessible.'
+          : errorMessage || 'Unable to analyze the image at this time.'
+      );
+    }
+  };
+
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -61,6 +143,20 @@ const AssetManagerProPage: React.FC = () => {
     setUploadProgress(0);
     setUploadError(null);
     setUploadedUrl(null);
+    setAnalysisStatus('idle');
+    setAnalysisResult(null);
+    setAnalysisError(null);
+
+    try {
+      const base64Image = await readFileAsBase64(file);
+      void analyzeImage(base64Image);
+    } catch (error) {
+      console.error('Unable to prepare file for analysis:', error);
+      setAnalysisStatus('error');
+      setAnalysisError(
+        'We could not prepare this file for AI analysis, but the upload will continue.'
+      );
+    }
 
     const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
     const uploadRef = storageRef(
@@ -92,6 +188,9 @@ const AssetManagerProPage: React.FC = () => {
         } finally {
           setUploading(false);
           setUploadProgress(null);
+          setAnalysisStatus((status) =>
+            status === 'idle' ? 'success' : status
+          );
         }
       }
     );
@@ -160,6 +259,24 @@ const AssetManagerProPage: React.FC = () => {
                     View asset photo
                   </a>
                 </p>
+              )}
+            </div>
+          )}
+          {(analysisStatus !== 'idle' || analysisError || analysisResult) && (
+            <div className='rounded-md border border-purple-100 bg-purple-50 p-4 text-sm text-purple-800'>
+              {analysisStatus === 'loading' && (
+                <p>Analyzing your asset photo with AI...</p>
+              )}
+              {analysisStatus === 'error' && analysisError && (
+                <p className='text-red-600'>{analysisError}</p>
+              )}
+              {analysisStatus === 'success' && analysisResult && (
+                <div>
+                  <p className='font-semibold'>AI Insight</p>
+                  <p className='mt-2 whitespace-pre-line text-purple-900'>
+                    {analysisResult}
+                  </p>
+                </div>
               )}
             </div>
           )}

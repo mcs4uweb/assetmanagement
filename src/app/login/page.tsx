@@ -2,17 +2,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [email, setEmail] = useState('test@test.com');
   const [password, setPassword] = useState('testtest');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(
+    () => searchParams.get('mode') === 'register'
+  );
 
-  const { login, googleSignIn, currentUser } = useAuth();
-  const router = useRouter();
+  const { login, signup, googleSignIn, currentUser } = useAuth();
 
   useEffect(() => {
     if (currentUser) {
@@ -20,18 +25,46 @@ export default function LoginPage() {
     }
   }, [currentUser, router]);
 
+  useEffect(() => {
+    const isRegisterQuery = searchParams.get('mode') === 'register';
+    setIsRegisterMode((prev) =>
+      prev === isRegisterQuery ? prev : isRegisterQuery
+    );
+  }, [searchParams]);
+
+  useEffect(() => {
+    setError('');
+  }, [isRegisterMode]);
+
+  const handleModeSwitch = (mode: 'login' | 'register') => {
+    setIsRegisterMode(mode === 'register');
+    if (mode === 'register') {
+      router.replace('/login?mode=register');
+    } else {
+      router.replace('/login');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      await login(email, password);
+      if (isRegisterMode) {
+        await signup(email, password);
+      } else {
+        await login(email, password);
+      }
       router.push('/home');
     } catch (error: any) {
-      setError('Failed to log in: ' + error.message);
+      const message = isRegisterMode
+        ? 'Failed to register: ' + error.message
+        : 'Failed to log in: ' + error.message;
+      setError(message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
@@ -96,10 +129,42 @@ export default function LoginPage() {
               disabled={loading}
               className='group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
             >
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading
+                ? isRegisterMode
+                  ? 'Creating account...'
+                  : 'Signing in...'
+                : isRegisterMode
+                ? 'Create account'
+                : 'Sign in'}
             </button>
           </div>
         </form>
+
+        <div className='text-center text-sm text-gray-600'>
+          {isRegisterMode ? (
+            <p>
+              Already have an account?{' '}
+              <button
+                type='button'
+                onClick={() => handleModeSwitch('login')}
+                className='font-medium text-blue-600 hover:text-blue-500'
+              >
+                Sign in
+              </button>
+            </p>
+          ) : (
+            <p>
+              Need an account?{' '}
+              <button
+                type='button'
+                onClick={() => handleModeSwitch('register')}
+                className='font-medium text-blue-600 hover:text-blue-500'
+              >
+                Register now
+              </button>
+            </p>
+          )}
+        </div>
 
         <div className='mt-6'>
           <button

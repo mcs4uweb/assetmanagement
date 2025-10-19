@@ -8,10 +8,11 @@ import {
   signOut,
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  updateProfile
 } from 'firebase/auth'
 import { auth, db } from '../lib/firebase'
-import { ref, set, get } from 'firebase/database'
+import { ref, set, get, update } from 'firebase/database'
 import { User } from '../models/User'
 
 interface AuthContextType {
@@ -20,6 +21,7 @@ interface AuthContextType {
   signup: (email: string, password: string) => Promise<any>
   logout: () => Promise<void>
   googleSignIn: () => Promise<any>
+  updateProfileDetails: (updates: Partial<User>) => Promise<void>
   loading: boolean
 }
 
@@ -78,6 +80,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return signOut(auth)
   }
 
+  const updateProfileDetails = async (updates: Partial<User>) => {
+    if (!auth.currentUser) {
+      throw new Error('No authenticated user found')
+    }
+
+    const allowedKeys: (keyof User)[] = [
+      'DisplayName',
+      'PhotoURL',
+      'Phone',
+      'Address',
+      'City',
+      'State',
+      'Zip',
+    ]
+
+    const payload: Partial<User> = {}
+    for (const key of allowedKeys) {
+      if (Object.prototype.hasOwnProperty.call(updates, key)) {
+        const value = updates[key]
+        if (value !== undefined) {
+          payload[key] = value
+        }
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return
+    }
+
+    const userRef = ref(db, `users/${auth.currentUser.uid}`)
+    await update(userRef, payload)
+
+    const profileUpdates: { displayName?: string | null; photoURL?: string | null } = {}
+    if (payload.DisplayName !== undefined) {
+      profileUpdates.displayName = payload.DisplayName || null
+    }
+    if (payload.PhotoURL !== undefined) {
+      profileUpdates.photoURL = payload.PhotoURL || null
+    }
+    if (Object.keys(profileUpdates).length > 0) {
+      await updateProfile(auth.currentUser, profileUpdates)
+    }
+
+    setCurrentUser((prev) => (prev ? { ...prev, ...payload } : prev))
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -101,6 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signup,
     logout,
     googleSignIn,
+    updateProfileDetails,
     loading
   }
 

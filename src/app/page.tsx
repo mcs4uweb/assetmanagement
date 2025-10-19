@@ -103,13 +103,17 @@ export default function LandingPage() {
       </section>
       <section className='bg-gray-50 py-12'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <h2 className='text-3xl font-bold text-center mb-8'>How It Works</h2>
+          <h2 className='text-3xl font-bold text-center mb-8 text-black'>
+            How It Works
+          </h2>
           <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
             <div className='text-center'>
               <div className='w-12 h-12 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center'>
                 <span className='text-blue-600 font-bold'>1</span>
               </div>
-              <h3 className='text-lg font-semibold mb-2'>Add Your Assets</h3>
+              <h3 className='text-lg font-semibold mb-2 text-black'>
+                Add Your Assets
+              </h3>
               <p className='text-gray-600'>
                 Input items with easy forms—upload photos and assign locations
                 for home or business use.
@@ -119,7 +123,9 @@ export default function LandingPage() {
               <div className='w-12 h-12 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center'>
                 <span className='text-blue-600 font-bold'>2</span>
               </div>
-              <h3 className='text-lg font-semibold mb-2'>Track & Manage</h3>
+              <h3 className='text-lg font-semibold mb-2 text-black'>
+                Track & Manage
+              </h3>
               <p className='text-gray-600'>
                 Monitor status, depreciation, and maintenance schedules with
                 real-time updates.
@@ -129,7 +135,9 @@ export default function LandingPage() {
               <div className='w-12 h-12 bg-blue-100 rounded-full mx-auto mb-4 flex items-center justify-center'>
                 <span className='text-blue-600 font-bold'>3</span>
               </div>
-              <h3 className='text-lg font-semibold mb-2'>Upgrade for Pro</h3>
+              <h3 className='text-lg font-semibold mb-2 text-black'>
+                Upgrade for Pro
+              </h3>
               <p className='text-gray-600'>
                 Unlock AI tools, unlimited assets, and detailed reports with a
                 Pro subscription.
@@ -162,27 +170,32 @@ export default function LandingPage() {
       </section>
       {/* Paywall/Pricing Section */}
       <section className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
-        <h2 className='text-3xl font-bold text-center mb-8'>Pricing Plans</h2>
+        <h2 className='text-3xl font-bold text-center mb-8 text-black'>
+          Pricing Plans
+        </h2>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-          <div className='bg-white p-6 rounded-lg shadow-md border-2 border-blue-600'>
-            <h3 className='text-xl font-semibold mb-2'>Free Tier</h3>
+          <div className='bg-white p-6 rounded-lg shadow-md'>
+            <h3 className='text-xl font-semibold mb-2 text-black'>Free Tier</h3>
             <p className='text-gray-600 mb-4'>Perfect for personal use.</p>
-            <p className='text-2xl font-bold mb-4'>$0/month</p>
+            <p className='text-2xl font-bold mb-4 text-black'>$0/month</p>
             <ul className='text-gray-600 mb-4 space-y-2'>
-              <li>Up to 100 assets</li>
+              <li>Up to 30 assets</li>
               <li>Basic tracking & forms</li>
               <li>Photo uploads</li>
             </ul>
-            <button className='w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition'>
+            <Link
+              href='/login?mode=register'
+              className='w-full flex justify-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition'
+            >
               Start Free
-            </button>
+            </Link>
           </div>
           <div className='bg-white p-6 rounded-lg shadow-md'>
-            <h3 className='text-xl font-semibold mb-2'>Pro Tier</h3>
+            <h3 className='text-xl font-semibold mb-2 text-black'>Pro Tier</h3>
             <p className='text-gray-600 mb-4'>
               Ideal for businesses and power users.
             </p>
-            <p className='text-2xl font-bold mb-4'>$9.99/month</p>
+            <p className='text-2xl font-bold mb-4 text-black'>$9.99/month</p>
             <ul className='text-gray-600 mb-4 space-y-2'>
               <li>Unlimited assets</li>
               <li>AI-powered insights</li>

@@ -9,6 +9,9 @@ export interface Vehicle {
   vin?: string
   plate?: string
   tires?: string
+  tireSize?: string
+  tirePressure?: string
+  oilType?: string
   purchaseDate?: Date
   parcelNumber?: string
   category?: string
