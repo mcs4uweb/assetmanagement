@@ -55,7 +55,7 @@ export default function LandingPage() {
           </p>
           <div className='flex flex-wrap gap-4'>
             <Link
-              href={currentUser ? '/home' : '/login'}
+              href={currentUser ? '/dashboard' : '/login'}
               className='inline-flex items-center justify-center rounded-md bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700'
             >
               {currentUser ? 'Go to your dashboard' : 'Sign in to get started'}
@@ -65,6 +65,12 @@ export default function LandingPage() {
               className='inline-flex items-center justify-center rounded-md border border-blue-600 px-6 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50'
             >
               Explore the platform
+            </Link>
+            <Link
+              href='/blog'
+              className='inline-flex items-center justify-center rounded-md border border-blue-600 px-6 py-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-50'
+            >
+              Read the blog
             </Link>
           </div>
         </div>

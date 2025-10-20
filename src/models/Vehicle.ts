@@ -12,10 +12,13 @@ export interface Vehicle {
   tireSize?: string
   tirePressure?: string
   oilType?: string
+  warranty?: boolean
+  warrantyExpiry?: Date | string
   purchaseDate?: Date
   parcelNumber?: string
   category?: string
   description?: string
+  notes?: string
   videos?: Video[]
   odometer?: Odometer[]
   oilChange?: OilChange[]

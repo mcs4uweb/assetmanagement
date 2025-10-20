@@ -20,3 +20,17 @@ html.dark {
     @apply bg-gray-900 text-gray-100;
   }
 }
+
+/* AI description fade animation */
+@keyframes ai-fade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.ai-fade {
+  animation: ai-fade 1s ease-in-out infinite alternate;
+}

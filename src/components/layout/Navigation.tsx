@@ -82,7 +82,9 @@ const Navigation: React.FC = () => {
   };
 
   const navigation = [
+    { name: 'Dashboard', href: '/dashboard', current: pathname === '/dashboard' },
     { name: 'My Assets', href: '/home', current: pathname === '/home' },
+    { name: 'Blog', href: '/blog', current: pathname.startsWith('/blog') },
     {
       name: 'Asset Manager Pro',
       href: '/asset-manager-pro',
@@ -137,6 +139,54 @@ const Navigation: React.FC = () => {
           </div>
 
           <div className='hidden items-center space-x-4 md:flex'>
+            {/* Notifications */}
+            <button
+              type='button'
+              onClick={() => router.push('/dashboard')}
+              className='relative p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400'
+              aria-label='Open notifications'
+              title='Notifications'
+            >
+              <svg
+                className='h-6 w-6'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+                />
+              </svg>
+              <span className='absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white'>
+                3
+              </span>
+            </button>
+
+            {/* Information */}
+            <button
+              type='button'
+              className='p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400'
+              aria-label='Information'
+              title='Information'
+            >
+              <svg
+                className='h-6 w-6'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z'
+                />
+              </svg>
+            </button>
+
             <button
               type='button'
               onClick={() => router.push('/cart')}

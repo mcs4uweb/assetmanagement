@@ -354,7 +354,13 @@ export default function HomePage() {
                 {items.map((asset) => (
                   <div
                     key={asset.key}
-                    onClick={() => router.push(`/homedetail/${asset.key}`)}
+                    onClick={() =>
+                      router.push(
+                        `/homedetail/${asset.key}?category=${encodeURIComponent(
+                          asset.category || category || ''
+                        )}`
+                      )
+                    }
                     className='bg-white rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow'
                   >
                     <div className='p-6'>

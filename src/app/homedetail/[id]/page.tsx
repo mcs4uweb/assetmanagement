@@ -18,7 +18,7 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { onValue, ref, remove, set } from 'firebase/database';
 import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -40,7 +40,6 @@ interface MaintenanceFormEntry {
 
 interface PartFormEntry {
   part: string;
-  type: string;
   url: string;
   date: string;
 }
@@ -82,6 +81,7 @@ export default function HomeDetailPage({ params }: PageProps) {
   const { id } = params;
   const { currentUser, loading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [asset, setAsset] = useState<Vehicle | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -97,7 +97,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     tireSize: '',
     tirePressure: '',
     oilType: '',
-    category: '',
+    category: searchParams.get('category') ?? '',
+    warranty: false,
+    warrantyExpiry: '',
   });
   const [quickInfoError, setQuickInfoError] = useState<string | null>(null);
   const [editingQuickInfoRowId, setEditingQuickInfoRowId] = useState<
@@ -130,6 +132,11 @@ export default function HomeDetailPage({ params }: PageProps) {
   const [isEditingParts, setIsEditingParts] = useState(false);
   const [isSavingParts, setIsSavingParts] = useState(false);
   const [partsError, setPartsError] = useState<string | null>(null);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
+  const [isNotesExpanded, setIsNotesExpanded] = useState(false);
   const [partFormState, setPartFormState] = useState<PartFormEntry[]>([]);
   const [editingPartRowId, setEditingPartRowId] = useState<number | null>(null);
   const [editingPartDraft, setEditingPartDraft] =
@@ -219,14 +226,21 @@ export default function HomeDetailPage({ params }: PageProps) {
       tireSize: '',
       tirePressure: '',
       oilType: '',
-      category: '',
+      category: searchParams.get('category') ?? '',
+      warranty: false,
+      warrantyExpiry: '',
     });
       setMaintenanceFormState([]);
       setEditingQuickInfoRowId(null);
       setQuickInfoRowDraft({ reading: '', date: '' });
       setIsSavingQuickInfoRow(false);
-      setIsEditingMaintenance(false);
+      setIsEditingMaintenance(searchParams.get('edit') === 'maintenance');
       setIsEditingParts(false);
+      setIsEditingNotes(false);
+      setIsSavingNotes(false);
+      setNotesError(null);
+      setNotesDraft('');
+      setIsNotesExpanded(false);
       setQuickInfoError(null);
       setIsQuickInfoAddMenuOpen(false);
       setQuickInfoAddType(null);
@@ -261,14 +275,34 @@ export default function HomeDetailPage({ params }: PageProps) {
       tireSize: asset.tireSize ?? '',
       tirePressure: asset.tirePressure ?? '',
       oilType: asset.oilType ?? '',
-      category: asset.category ?? '',
+      category: asset.category ?? searchParams.get('category') ?? '',
+      warranty: Boolean(asset.warranty),
+      warrantyExpiry:
+        asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
+          ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
+          : '',
     });
-    setMaintenanceFormState(buildMaintenanceFormState(asset));
+    const nextMaintenanceState = buildMaintenanceFormState(asset);
+    if (
+      searchParams.get('edit') === 'maintenance' &&
+      nextMaintenanceState.length === 0
+    ) {
+      setMaintenanceFormState([
+        { maintenanceType: '', maintenanceDesc: '', maintenanceEndDate: '' },
+      ]);
+    } else {
+      setMaintenanceFormState(nextMaintenanceState);
+    }
     setEditingQuickInfoRowId(null);
     setQuickInfoRowDraft({ reading: '', date: '' });
     setIsSavingQuickInfoRow(false);
-    setIsEditingMaintenance(false);
+    setIsEditingMaintenance(searchParams.get('edit') === 'maintenance');
     setIsEditingParts(false);
+    setIsEditingNotes(false);
+    setIsSavingNotes(false);
+    setNotesError(null);
+    setNotesDraft(asset.notes ?? '');
+    setIsNotesExpanded(false);
     setQuickInfoError(null);
     setIsQuickInfoAddMenuOpen(false);
     setQuickInfoAddType(null);
@@ -289,6 +323,16 @@ export default function HomeDetailPage({ params }: PageProps) {
     setPendingPartDeleteName(null);
     setPendingQuickInfoDeleteRow(null);
   }, [asset]);
+
+  // Scroll maintenance section into view when linked with ?edit=maintenance
+  useEffect(() => {
+    if (searchParams.get('edit') === 'maintenance') {
+      if (typeof window !== 'undefined') {
+        const section = document.getElementById('maintenance-section');
+        section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, [asset, searchParams]);
 
   const handleFieldChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -319,9 +363,15 @@ export default function HomeDetailPage({ params }: PageProps) {
         tirePressure: formState.tirePressure.trim(),
         oilType: formState.oilType.trim(),
         category: formState.category.trim(),
+        warranty: Boolean(formState.warranty),
+        warrantyExpiry:
+          formState.warrantyExpiry && !Number.isNaN(new Date(formState.warrantyExpiry).getTime())
+            ? new Date(formState.warrantyExpiry).toISOString()
+            : undefined,
       };
 
-      await set(targetRef, updatedAsset);
+      const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
+      await set(targetRef, sanitizedAsset);
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to update asset', error);
@@ -487,7 +537,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     setUpdatePartError(null);
     setPartFormState((prev) => {
       const base = isEditingParts ? prev : [];
-      return [...base, { part: '', type: '', url: '', date: '' }];
+      return [...base, { part: '', url: '', date: '' }];
     });
   };
 
@@ -502,6 +552,29 @@ export default function HomeDetailPage({ params }: PageProps) {
     });
   };
 
+  const handleNotesSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!currentUser || !asset) return;
+
+    setIsSavingNotes(true);
+    setNotesError(null);
+    try {
+      const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+      const updatedAsset: Vehicle & Record<string, unknown> = {
+        ...asset,
+        notes: notesDraft.trim() ? notesDraft.trim() : undefined,
+      };
+      const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
+      await set(targetRef, sanitizedAsset);
+      setIsEditingNotes(false);
+    } catch (error) {
+      console.error('Failed to save notes', error);
+      setNotesError('Unable to save notes. Please try again.');
+    } finally {
+      setIsSavingNotes(false);
+    }
+  };
+
   const handlePartsSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!currentUser || !asset) return;
@@ -509,7 +582,6 @@ export default function HomeDetailPage({ params }: PageProps) {
     const sanitizedEntries: Part[] = [];
     for (const entry of partFormState) {
       const trimmedPart = entry.part.trim();
-      const trimmedType = entry.type.trim();
       const trimmedUrl = entry.url.trim();
       const dateValue = entry.date.trim();
 
@@ -523,10 +595,9 @@ export default function HomeDetailPage({ params }: PageProps) {
         isoDate = parsedDate.toISOString();
       }
 
-      if (trimmedPart || trimmedType || trimmedUrl || isoDate) {
+      if (trimmedPart || trimmedUrl || isoDate) {
         sanitizedEntries.push({
           part: trimmedPart || undefined,
-          type: trimmedType || undefined,
           url: trimmedUrl || undefined,
           date: isoDate,
         });
@@ -553,7 +624,8 @@ export default function HomeDetailPage({ params }: PageProps) {
         partNumber: mergedParts,
       };
 
-      await set(targetRef, updatedAsset);
+      const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
+      await set(targetRef, sanitizedAsset);
       setIsEditingParts(false);
       setPartFormState([]);
     } catch (error) {
@@ -573,7 +645,6 @@ export default function HomeDetailPage({ params }: PageProps) {
     setEditingPartRowId(index);
     setEditingPartDraft({
       part: part.part ?? '',
-      type: part.type ?? '',
       url: part.url ?? '',
       date: parsedDate,
     });
@@ -607,7 +678,6 @@ export default function HomeDetailPage({ params }: PageProps) {
       }
 
       const trimmedPart = editingPartDraft.part.trim();
-      const trimmedType = editingPartDraft.type.trim();
       const trimmedUrl = editingPartDraft.url.trim();
       const dateValue = editingPartDraft.date.trim();
 
@@ -621,7 +691,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         isoDate = parsedDate.toISOString();
       }
 
-      if (!trimmedPart && !trimmedType && !trimmedUrl && !isoDate) {
+      if (!trimmedPart && !trimmedUrl && !isoDate) {
         setUpdatePartError('Part details cannot be completely empty.');
         return;
       }
@@ -642,16 +712,14 @@ export default function HomeDetailPage({ params }: PageProps) {
         updatedParts[index] = {
           ...updatedParts[index],
           part: trimmedPart || undefined,
-          type: trimmedType || undefined,
           url: trimmedUrl || undefined,
           date: isoDate,
         };
 
         const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
-        await set(targetRef, {
-          ...asset,
-          partNumber: updatedParts,
-        });
+        const updatedAsset = { ...asset, partNumber: updatedParts } as Vehicle & Record<string, unknown>;
+        const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
+        await set(targetRef, sanitizedAsset);
 
         setEditingPartRowId(null);
         setEditingPartDraft(null);
@@ -1463,28 +1531,61 @@ export default function HomeDetailPage({ params }: PageProps) {
       return String(value).trim();
     };
 
-    const entries: OverviewDetailEntry[] = [
-      {
-        label: 'Tire Size',
-        value: normalizeValue(asset.tireSize),
-        column: 'primary',
-        placeholder: 'Not set',
-        alwaysShow: true,
-      },
-      {
-        label: 'Tire Pressure',
-        value: normalizeValue(asset.tirePressure),
-        column: 'primary',
-        placeholder: 'Not set',
-        alwaysShow: true,
-      },
-      {
-        label: 'Oil Type',
-        value: normalizeValue(asset.oilType),
-        column: 'primary',
-        placeholder: 'Not set',
-        alwaysShow: true,
-      },
+    const isHousehold = (asset.category ?? '').toString().toLowerCase().trim() === 'household';
+    const entries: OverviewDetailEntry[] = [];
+
+    if (!isHousehold) {
+      entries.push(
+        {
+          label: 'Tire Size',
+          value: normalizeValue(asset.tireSize),
+          column: 'primary',
+          placeholder: 'Not set',
+          alwaysShow: true,
+        },
+        {
+          label: 'Tire Pressure',
+          value: normalizeValue(asset.tirePressure),
+          column: 'primary',
+          placeholder: 'Not set',
+          alwaysShow: true,
+        },
+        {
+          label: 'Oil Type',
+          value: normalizeValue(asset.oilType),
+          column: 'primary',
+          placeholder: 'Not set',
+          alwaysShow: true,
+        },
+      );
+    } else {
+      const warrantyValue = typeof asset.warranty === 'boolean' ? (asset.warranty ? 'Yes' : 'No') : '';
+      let warrantyExpiry = '';
+      if (asset.warrantyExpiry) {
+        const d = new Date(asset.warrantyExpiry as any);
+        if (!Number.isNaN(d.getTime())) {
+          warrantyExpiry = d.toLocaleDateString();
+        }
+      }
+      entries.push(
+        {
+          label: 'Under Warranty',
+          value: warrantyValue,
+          column: 'primary',
+          placeholder: 'Not set',
+          alwaysShow: true,
+        },
+        {
+          label: 'Warranty Expiry',
+          value: warrantyExpiry,
+          column: 'primary',
+          placeholder: 'Not set',
+          alwaysShow: true,
+        },
+      );
+    }
+
+    entries.push(
       {
         label: 'VIN',
         value: normalizeValue(asset.vin),
@@ -1495,7 +1596,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         value: normalizeValue(asset.plate),
         column: 'secondary',
       },
-    ];
+    );
 
     const filtered = entries
       .filter((entry) => entry.alwaysShow || entry.value.length > 0)
@@ -1837,35 +1938,7 @@ export default function HomeDetailPage({ params }: PageProps) {
           );
         },
       },
-      {
-        accessorKey: 'type',
-        header: ({ column }) => (
-          <button
-            type='button'
-            onClick={column.getToggleSortingHandler()}
-            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
-          >
-            Type
-            <span className='text-gray-400'>
-              {sortingIndicator(column.getIsSorted())}
-            </span>
-          </button>
-        ),
-        cell: ({ row }) => {
-          const isEditing = editingPartRowId === row.index && editingPartDraft;
-          return isEditing ? (
-            <input
-              value={editingPartDraft.type}
-              onChange={(event) =>
-                handlePartDraftChange('type', event.target.value)
-              }
-              className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
-            />
-          ) : (
-            row.original.type || '—'
-          );
-        },
-      },
+      // Type column removed
       {
         accessorKey: 'date',
         header: ({ column }) => (
@@ -1957,10 +2030,9 @@ export default function HomeDetailPage({ params }: PageProps) {
             );
           }
 
-          const { part, type, description } = row.original;
+          const { part, description } = row.original;
           const hasAskAiDetails = Boolean(
             (part && part.trim()) ||
-              (type && type.trim()) ||
               (typeof description === 'string' && description.trim())
           );
 
@@ -2224,6 +2296,58 @@ export default function HomeDetailPage({ params }: PageProps) {
                       <div className='grid gap-4 sm:grid-cols-2'>
                         <div>
                           <label
+                            htmlFor='make'
+                            className='block text-sm font-medium text-gray-700'
+                          >
+                            Make
+                          </label>
+                          <input
+                            id='make'
+                            name='make'
+                            value={formState.make}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. Toyota'
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor='model'
+                            className='block text-sm font-medium text-gray-700'
+                          >
+                            Model
+                          </label>
+                          <input
+                            id='model'
+                            name='model'
+                            value={formState.model}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. RAV4'
+                          />
+                        </div>
+                        <div>
+                          <label
+                            htmlFor='year'
+                            className='block text-sm font-medium text-gray-700'
+                          >
+                            Year
+                          </label>
+                          <input
+                            id='year'
+                            name='year'
+                            type='number'
+                            inputMode='numeric'
+                            min='1900'
+                            max='2099'
+                            value={formState.year}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. 2018'
+                          />
+                        </div>
+                        <div>
+                          <label
                             htmlFor='vin'
                             className='block text-sm font-medium text-gray-700'
                           >
@@ -2252,54 +2376,78 @@ export default function HomeDetailPage({ params }: PageProps) {
                             className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
-                        <div>
-                          <label
-                            htmlFor='tireSize'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Tire Size
-                          </label>
-                          <input
-                            id='tireSize'
-                            name='tireSize'
-                            value={formState.tireSize}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            placeholder='e.g. 225/65R17'
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor='tirePressure'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Tire Pressure
-                          </label>
-                          <input
-                            id='tirePressure'
-                            name='tirePressure'
-                            value={formState.tirePressure}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            placeholder='e.g. 35 PSI'
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor='oilType'
-                            className='block text-sm font-medium text-gray-700'
-                          >
-                            Oil Type
-                          </label>
-                          <input
-                            id='oilType'
-                            name='oilType'
-                            value={formState.oilType}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            placeholder='e.g. 5W-30 Synthetic'
-                          />
-                        </div>
+                        {formState.category.trim().toLowerCase() !== 'household' ? (
+                          <>
+                            <div>
+                              <label htmlFor='tireSize' className='block text-sm font-medium text-gray-700'>
+                                Tire Size
+                              </label>
+                              <input
+                                id='tireSize'
+                                name='tireSize'
+                                value={formState.tireSize}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. 225/65R17'
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor='tirePressure' className='block text-sm font-medium text-gray-700'>
+                                Tire Pressure
+                              </label>
+                              <input
+                                id='tirePressure'
+                                name='tirePressure'
+                                value={formState.tirePressure}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. 35 PSI'
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor='oilType' className='block text-sm font-medium text-gray-700'>
+                                Oil Type
+                              </label>
+                              <input
+                                id='oilType'
+                                name='oilType'
+                                value={formState.oilType}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. 5W-30 Synthetic'
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className='flex items-center gap-2'>
+                              <input
+                                id='warranty'
+                                name='warranty'
+                                type='checkbox'
+                                checked={formState.warranty}
+                                onChange={(e) => setFormState((prev) => ({ ...prev, warranty: e.target.checked }))}
+                                className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                              />
+                              <label htmlFor='warranty' className='text-sm font-medium text-gray-700'>
+                                Under Warranty
+                              </label>
+                            </div>
+                            <div>
+                              <label htmlFor='warrantyExpiry' className='block text-sm font-medium text-gray-700'>
+                                Warranty Expiry
+                              </label>
+                              <input
+                                id='warrantyExpiry'
+                                name='warrantyExpiry'
+                                type='date'
+                                value={formState.warrantyExpiry}
+                                onChange={(e) => setFormState((prev) => ({ ...prev, warrantyExpiry: e.target.value }))}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {errorMessage && (
@@ -2339,24 +2487,24 @@ export default function HomeDetailPage({ params }: PageProps) {
                       </div>
                     </form>
                   ) : (
-                    <div className='mt-6 space-y-6'>
+                    <div className='mt-3 space-y-3'>
                       {hasDetailEntries ? (
                         <dl
-                          className={`grid gap-6${
+                          className={`grid gap-3${
                             hasSecondaryDetailEntries ? ' sm:grid-cols-2' : ''
                           }`}
                         >
                           {detailEntries.primary.length > 0 && (
-                            <div className='space-y-4'>
+                            <div className='space-y-2'>
                               {detailEntries.primary.map((entry) => (
                                 <div
                                   key={entry.label}
-                                  className='grid gap-2 sm:grid-cols-[140px,1fr]'
+                                  className='grid gap-1 sm:grid-cols-[140px,1fr]'
                                 >
-                                  <dt className='text-sm font-medium text-gray-500'>
+                                  <dt className='text-sm leading-none font-medium text-gray-500'>
                                     {entry.label}
                                   </dt>
-                                  <dd className='text-sm text-gray-900'>
+                                  <dd className='text-sm leading-none text-gray-900'>
                                     {entry.displayValue ?? entry.value}
                                   </dd>
                                 </div>
@@ -2364,16 +2512,16 @@ export default function HomeDetailPage({ params }: PageProps) {
                             </div>
                           )}
                           {hasSecondaryDetailEntries && (
-                            <div className='space-y-4'>
+                            <div className='space-y-2'>
                               {detailEntries.secondary.map((entry) => (
                                 <div
                                   key={entry.label}
-                                  className='grid gap-2 sm:grid-cols-[140px,1fr]'
+                                  className='grid gap-1 sm:grid-cols-[140px,1fr]'
                                 >
-                                  <dt className='text-sm font-medium text-gray-500'>
+                                  <dt className='text-sm leading-none font-medium text-gray-500'>
                                     {entry.label}
                                   </dt>
-                                  <dd className='text-sm text-gray-900'>
+                                  <dd className='text-sm leading-none text-gray-900'>
                                     {entry.displayValue ?? entry.value}
                                   </dd>
                                 </div>
@@ -2609,7 +2757,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                   </div>
                 </section>
 
-                <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+                <section id='maintenance-section' className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
                   <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold text-gray-900'>
                       Maintenance
@@ -2836,6 +2984,14 @@ export default function HomeDetailPage({ params }: PageProps) {
                     </h2>
                   </div>
                   <div className='mt-4 space-y-3'>
+                    <div
+                      className={`flex items-center text-sm text-gray-600 overflow-hidden transition-all duration-500 ${
+                        isGeneratingAiDescription ? 'opacity-100 max-h-8' : 'opacity-0 max-h-0'
+                      }`}
+                    >
+                      <span className='mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent' />
+                      <span className='ai-fade'>Generating AI description...</span>
+                    </div>
                     {hasDescriptionPrompt ? (
                       descriptionSourceOverride ? (
                         <div className='space-y-1 text-sm text-gray-600'>
@@ -2881,6 +3037,118 @@ export default function HomeDetailPage({ params }: PageProps) {
                       </div>
                     )}
                   </div>
+                </section>
+
+                <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+                  <div className='flex items-center justify-between'>
+                    <h2 className='text-xl font-semibold text-gray-900'>
+                      General Notes
+                    </h2>
+                    {!isEditingNotes && (
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setIsEditingNotes(true);
+                          setNotesError(null);
+                          setNotesDraft(asset?.notes ?? '');
+                        }}
+                        className='rounded-md border border-green-400 bg-green-100 px-3 py-1 text-sm font-medium text-green-700 transition hover:bg-green-200'
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </div>
+
+                  {isEditingNotes ? (
+                    <form onSubmit={handleNotesSave} className='mt-4 space-y-3'>
+                      {notesError && (
+                        <p className='text-sm text-red-600'>{notesError}</p>
+                      )}
+                      <div>
+                        <label htmlFor='general-notes' className='block text-sm font-medium text-gray-700'>
+                          Notes
+                        </label>
+                        <textarea
+                          id='general-notes'
+                          value={notesDraft}
+                          onChange={(e) => setNotesDraft(e.target.value)}
+                          rows={5}
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                        />
+                      </div>
+                      <div className='flex items-center gap-3'>
+                        <button
+                          type='submit'
+                          disabled={isSavingNotes}
+                          className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+                        >
+                          {isSavingNotes ? 'Saving...' : 'Save Notes'}
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() => {
+                            setIsEditingNotes(false);
+                            setNotesError(null);
+                            setNotesDraft(asset?.notes ?? '');
+                          }}
+                          className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100'
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : asset?.notes && asset.notes.trim().length > 0 ? (
+                    (() => {
+                      const full = asset.notes as string;
+                      const MAX_PREVIEW = 280;
+                      const shouldTruncate = full.length > MAX_PREVIEW;
+                      const preview = shouldTruncate
+                        ? full.slice(0, MAX_PREVIEW).trimEnd() + '…'
+                        : full;
+                      return (
+                        <p className='mt-2 whitespace-pre-line text-sm text-gray-700'>
+                          {isNotesExpanded ? preview && shouldTruncate ? (
+                            // When expanded and truncated exists, show full content
+                            full
+                          ) : (
+                            full
+                          ) : (
+                            preview
+                          )}
+                          {shouldTruncate && (
+                            <>
+                              {' '}
+                              {isNotesExpanded ? (
+                                <button
+                                  type='button'
+                                  onClick={() => setIsNotesExpanded(false)}
+                                  className='text-blue-600 underline hover:text-blue-700'
+                                  aria-label='Show less notes'
+                                  title='Show less'
+                                >
+                                  Show less
+                                </button>
+                              ) : (
+                                <button
+                                  type='button'
+                                  onClick={() => setIsNotesExpanded(true)}
+                                  className='text-blue-600 underline hover:text-blue-700'
+                                  aria-label='Show more notes'
+                                  title='Show more'
+                                >
+                                  Show more
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      );
+                    })()
+                  ) : (
+                    <p className='mt-2 text-sm text-gray-500'>
+                      No notes yet. Add any general details, reminders, or context here.
+                    </p>
+                  )}
                 </section>
 
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
@@ -2938,26 +3206,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
-                            <div>
-                              <label
-                                htmlFor={`part-type-${index}`}
-                                className='block text-sm font-medium text-gray-700'
-                              >
-                                Part Type
-                              </label>
-                              <input
-                                id={`part-type-${index}`}
-                                value={entry.type}
-                                onChange={(event) =>
-                                  handlePartFieldChange(
-                                    index,
-                                    'type',
-                                    event.target.value
-                                  )
-                                }
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                              />
-                            </div>
+                            
                             <div>
                               <label
                                 htmlFor={`part-url-${index}`}
@@ -3172,3 +3421,4 @@ export default function HomeDetailPage({ params }: PageProps) {
     </>
   );
 }
+  

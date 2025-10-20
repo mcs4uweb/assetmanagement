@@ -9,8 +9,8 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [email, setEmail] = useState('test@test.com');
-  const [password, setPassword] = useState('testtest');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isRegisterMode, setIsRegisterMode] = useState(
@@ -103,7 +103,6 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className='relative block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-black placeholder-gray-500 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-blue-500 dark:bg-white dark:text-black dark:focus:bg-white'
-              placeholder='Email address'
             />
           </div>
 
