@@ -106,13 +106,23 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleAiToggleClick = () => {
-    setProAiEnabled((value) => !value);
-    setIsProModalOpen(true);
+    setProAiEnabled((prev) => {
+      const next = !prev;
+      if (!prev && next) {
+        setIsProModalOpen(true);
+      }
+      return next;
+    });
   };
 
   const handleCloudToggleClick = () => {
-    setCloudBackupEnabled((value) => !value);
-    setIsProModalOpen(true);
+    setCloudBackupEnabled((prev) => {
+      const next = !prev;
+      if (!prev && next) {
+        setIsProModalOpen(true);
+      }
+      return next;
+    });
   };
 
   if (loading || !currentUser) {

@@ -24,7 +24,7 @@ import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
 import { Vehicle, type Maintenance, type Part } from '../../../models/Vehicle';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Calendar, Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 interface PageProps {
   params: {
@@ -1302,14 +1302,37 @@ export default function HomeDetailPage({ params }: PageProps) {
           const isEditingRow = editingQuickInfoRowId === row.original.id;
           if (isEditingRow) {
             return (
-              <input
-                type='date'
-                value={quickInfoRowDraft.date}
-                onChange={(event) =>
-                  handleQuickInfoRowDraftChange('date', event.target.value)
-                }
-                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
-              />
+              <div className='relative'>
+                <Calendar
+                  className='absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.parentElement?.querySelector(
+                      "input[type='date']"
+                    ) as HTMLInputElement | null;
+                    if (input) {
+                      try {
+                        (input as any).showPicker?.();
+                      } catch {}
+                      input.focus();
+                      input.click();
+                    }
+                  }}
+                />
+                <input
+                  type='date'
+                  value={quickInfoRowDraft.date}
+                  onChange={(event) =>
+                    handleQuickInfoRowDraftChange('date', event.target.value)
+                  }
+                  onClick={(e) => {
+                    try {
+                      (e.currentTarget as any).showPicker?.();
+                    } catch {}
+                  }}
+                  className='w-full rounded-md border border-gray-300 bg-white pl-8 pr-2 py-1 text-sm text-gray-900'
+                />
+              </div>
             );
           }
           return (
@@ -1861,14 +1884,37 @@ export default function HomeDetailPage({ params }: PageProps) {
           const isEditing = editingPartRowId === row.index && editingPartDraft;
           if (isEditing) {
             return (
-              <input
-                type='date'
-                value={editingPartDraft.date}
-                onChange={(event) =>
-                  handlePartDraftChange('date', event.target.value)
-                }
-                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
-              />
+              <div className='relative'>
+                <Calendar
+                  className='absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const input = e.currentTarget.parentElement?.querySelector(
+                      "input[type='date']"
+                    ) as HTMLInputElement | null;
+                    if (input) {
+                      try {
+                        (input as any).showPicker?.();
+                      } catch {}
+                      input.focus();
+                      input.click();
+                    }
+                  }}
+                />
+                <input
+                  type='date'
+                  value={editingPartDraft.date}
+                  onChange={(event) =>
+                    handlePartDraftChange('date', event.target.value)
+                  }
+                  onClick={(e) => {
+                    try {
+                      (e.currentTarget as any).showPicker?.();
+                    } catch {}
+                  }}
+                  className='w-full rounded-md border border-gray-300 bg-white pl-8 pr-2 py-1 text-sm text-gray-900'
+                />
+              </div>
             );
           }
 
@@ -2367,7 +2413,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                           setQuickInfoAddType(null);
                           cancelEditingQuickInfoRow();
                         }}
-                        className='rounded-full border border-blue-300 bg-blue-50 p-1 text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50'
+                        className='inline-flex items-center justify-center rounded-full border border-green-400 bg-green-50 p-2 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
                         aria-label='Add quick info entry'
                         disabled={isSavingQuickInfoRow || isDeletingQuickInfoRow}
                       >
@@ -2453,18 +2499,41 @@ export default function HomeDetailPage({ params }: PageProps) {
                           >
                             Date
                           </label>
-                          <input
-                            id='quickInfoAddDate'
-                            type='date'
-                            value={quickInfoAddForm.date}
-                            onChange={(event) =>
-                              handleQuickInfoAddFieldChange(
-                                'date',
-                                event.target.value
-                              )
-                            }
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                          />
+                          <div className='relative mt-1'>
+                            <Calendar
+                              className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                const input = e.currentTarget.parentElement?.querySelector(
+                                  "input[type='date']"
+                                ) as HTMLInputElement | null;
+                                if (input) {
+                                  try {
+                                    (input as any).showPicker?.();
+                                  } catch {}
+                                  input.focus();
+                                  input.click();
+                                }
+                              }}
+                            />
+                            <input
+                              id='quickInfoAddDate'
+                              type='date'
+                              value={quickInfoAddForm.date}
+                              onChange={(event) =>
+                                handleQuickInfoAddFieldChange(
+                                  'date',
+                                  event.target.value
+                                )
+                              }
+                              onClick={(e) => {
+                                try {
+                                  (e.currentTarget as any).showPicker?.();
+                                } catch {}
+                              }}
+                              className='w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900'
+                            />
+                          </div>
                         </div>
                       </div>
                       <div className='flex items-center gap-3 pt-2'>
@@ -2631,19 +2700,42 @@ export default function HomeDetailPage({ params }: PageProps) {
                               >
                                 Due Date
                               </label>
-                              <input
-                                id={`maintenanceDue-${index}`}
-                                type='date'
-                                value={entry.maintenanceEndDate}
-                                onChange={(event) =>
-                                  handleMaintenanceFieldChange(
-                                    index,
-                                    'maintenanceEndDate',
-                                    event.target.value
-                                  )
-                                }
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                              />
+                              <div className='relative mt-1'>
+                                <Calendar
+                                  className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    const input = e.currentTarget.parentElement?.querySelector(
+                                      "input[type='date']"
+                                    ) as HTMLInputElement | null;
+                                    if (input) {
+                                      try {
+                                        (input as any).showPicker?.();
+                                      } catch {}
+                                      input.focus();
+                                      input.click();
+                                    }
+                                  }}
+                                />
+                                <input
+                                  id={`maintenanceDue-${index}`}
+                                  type='date'
+                                  value={entry.maintenanceEndDate}
+                                  onChange={(event) =>
+                                    handleMaintenanceFieldChange(
+                                      index,
+                                      'maintenanceEndDate',
+                                      event.target.value
+                                    )
+                                  }
+                                  onClick={(e) => {
+                                    try {
+                                      (e.currentTarget as any).showPicker?.();
+                                    } catch {}
+                                  }}
+                                  className='w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900'
+                                />
+                              </div>
                             </div>
                             <div className='flex justify-end'>
                               <button
@@ -2894,19 +2986,42 @@ export default function HomeDetailPage({ params }: PageProps) {
                               >
                                 Date Needed
                               </label>
-                              <input
-                                id={`part-date-${index}`}
-                                type='date'
-                                value={entry.date}
-                                onChange={(event) =>
-                                  handlePartFieldChange(
-                                    index,
-                                    'date',
-                                    event.target.value
-                                  )
-                                }
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                              />
+                              <div className='relative mt-1'>
+                                <Calendar
+                                  className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    const input = e.currentTarget.parentElement?.querySelector(
+                                      "input[type='date']"
+                                    ) as HTMLInputElement | null;
+                                    if (input) {
+                                      try {
+                                        (input as any).showPicker?.();
+                                      } catch {}
+                                      input.focus();
+                                      input.click();
+                                    }
+                                  }}
+                                />
+                                <input
+                                  id={`part-date-${index}`}
+                                  type='date'
+                                  value={entry.date}
+                                  onChange={(event) =>
+                                    handlePartFieldChange(
+                                      index,
+                                      'date',
+                                      event.target.value
+                                    )
+                                  }
+                                  onClick={(e) => {
+                                    try {
+                                      (e.currentTarget as any).showPicker?.();
+                                    } catch {}
+                                  }}
+                                  className='w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm text-gray-900'
+                                />
+                              </div>
                             </div>
                             <div className='flex justify-end'>
                               <button

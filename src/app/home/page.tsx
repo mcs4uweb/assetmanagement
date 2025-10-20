@@ -1,7 +1,7 @@
 // src/app/home/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -25,6 +25,15 @@ export default function HomePage() {
     plate: '',
     tires: '',
   });
+
+  // Years dropdown options from current year down to 1980
+  const yearOptions = useMemo(() => {
+    const current = new Date().getFullYear();
+    const start = 1980;
+    const years: number[] = [];
+    for (let y = current; y >= start; y -= 1) years.push(y);
+    return years;
+  }, []);
 
   useEffect(() => {
     if (!currentUser) {
@@ -54,6 +63,54 @@ export default function HomePage() {
       router.replace('/login');
     }
   }, [loading, currentUser, router]);
+
+  // Group assets by category with desired order
+  const groupedAssets = useMemo(() => {
+    const order: Record<string, number> = { vehicle: 0, household: 1, bike: 2 };
+    const groups: Record<string, Vehicle[]> = {};
+
+    const normalizeCategory = (a: Vehicle): string => {
+      const raw = (a.category || '').toLowerCase().trim();
+      if (raw in order) return raw;
+      // Treat common vehicle-like values/brands as vehicles
+      const vehicleAliases = new Set([
+        'car',
+        'cars',
+        'truck',
+        'trucks',
+        'suv',
+        'van',
+        'motorcycle',
+        'motorbike',
+        'atv',
+        'utv',
+        'dodge',
+        'polaris',
+        'polarius',
+      ]);
+      if (vehicleAliases.has(raw)) return 'vehicle';
+      // If it has a VIN or plate, consider it a vehicle
+      if ((a.vin && a.vin.trim()) || (a.plate && a.plate.trim())) return 'vehicle';
+      return 'other';
+    };
+
+    for (const a of assets) {
+      const key = normalizeCategory(a);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(a);
+    }
+    const categories = Object.keys(groups).sort(
+      (a, b) => (order[a] ?? 99) - (order[b] ?? 99)
+    );
+    return categories.map((c) => ({ category: c, items: groups[c] }));
+  }, [assets]);
+
+  const categoryLabel: Record<string, string> = {
+    vehicle: 'Vehicles',
+    household: 'Household Items',
+    bike: 'Bikes',
+    other: 'Other',
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,32 +173,6 @@ export default function HomePage() {
         <header className='bg-white shadow'>
           <div className='max-w-7xl mx-auto px-4 py-4 flex justify-between items-center'>
             <h1 className='text-2xl font-bold text-blue-600'>My Assets</h1>
-            <div className='flex items-center space-x-4'>
-              <button
-                type='button'
-                onClick={() => router.push('/cart')}
-                className='relative p-2 text-gray-600 hover:text-blue-600'
-              >
-                <svg
-                  className='w-6 h-6'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5.5M7 13l2.5 5.5m0 0L17 21'
-                  />
-                </svg>
-                {cartTotal > 0 && (
-                  <span className='absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center'>
-                    {cartTotal}
-                  </span>
-                )}
-              </button>
-            </div>
           </div>
         </header>
 
@@ -208,7 +239,7 @@ export default function HomePage() {
                 onChange={(e) => {
                   const value = e.target.value;
                   setSelectedAsset(value);
-                  if (value === 'bike') {
+                  if (value === 'bike' || value === 'household') {
                     setFormData((prev) => ({
                       ...prev,
                       vin: '',
@@ -255,16 +286,27 @@ export default function HomePage() {
                     <label className='block text-sm font-medium text-gray-700'>
                       Year
                     </label>
-                    <input
-                      type='number'
+                    <select
                       name='year'
-                      value={formData.year}
-                      onChange={handleInputChange}
+                      value={formData.year ?? ''}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          year: e.target.value ? Number(e.target.value) : undefined,
+                        }))
+                      }
                       className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
-                    />
+                    >
+                      <option value=''>Select Year</option>
+                      {yearOptions.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  {selectedAsset !== 'bike' && (
-                    <div>
+                  {selectedAsset !== 'bike' && selectedAsset !== 'household' && (
+                   <div>
                       <label className='block text-sm font-medium text-gray-700'>
                         VIN
                       </label>
@@ -273,6 +315,7 @@ export default function HomePage() {
                         name='vin'
                         value={formData.vin}
                         onChange={handleInputChange}
+                        required
                         className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
                       />
                     </div>
@@ -297,28 +340,40 @@ export default function HomePage() {
             </div>
           )}
 
-          <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-            {assets.map((asset) => (
-              <div
-                key={asset.key}
-                onClick={() => router.push(`/homedetail/${asset.key}`)}
-                className='bg-white rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow'
-              >
-                <div className='p-6'>
-                  <h3 className='text-lg font-semibold text-gray-900'>
-                    {asset.make}
-                  </h3>
-                  <p className='text-gray-600'>
-                    {asset.model} {asset.year}
-                  </p>
-                  <div className='mt-2 text-sm text-gray-500'>
-                    <p>VIN: {asset.vin || 'Not set'}</p>
-                    <p>Plate: {asset.plate || 'Not set'}</p>
-                  </div>
+          {groupedAssets.map(({ category, items }) => (
+            <div key={category} className='mt-8'>
+              <div className='mb-2'>
+                <div className='text-xs font-medium uppercase tracking-wide text-gray-500'>
+                  Category
+                </div>
+                <div className='text-lg font-semibold text-gray-900'>
+                  {categoryLabel[category] ?? category}
                 </div>
               </div>
-            ))}
-          </div>
+              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+                {items.map((asset) => (
+                  <div
+                    key={asset.key}
+                    onClick={() => router.push(`/homedetail/${asset.key}`)}
+                    className='bg-white rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow'
+                  >
+                    <div className='p-6'>
+                      <h3 className='text-lg font-semibold text-gray-900'>
+                        {asset.make}
+                      </h3>
+                      <p className='text-gray-600'>
+                        {asset.model} {asset.year}
+                      </p>
+                      <div className='mt-2 text-sm text-gray-500'>
+                        <p>VIN: {asset.vin || 'Not set'}</p>
+                        <p>Plate: {asset.plate || 'Not set'}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
 
           {assets.length > 0 && (
             <button

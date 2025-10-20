@@ -137,6 +137,31 @@ const Navigation: React.FC = () => {
           </div>
 
           <div className='hidden items-center space-x-4 md:flex'>
+            <button
+              type='button'
+              onClick={() => router.push('/cart')}
+              className='relative p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400'
+              aria-label='Open cart'
+            >
+              <svg
+                className='h-6 w-6'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5.5M7 13l2.5 5.5m0 0L17 21'
+                />
+              </svg>
+              {cartTotal > 0 && (
+                <span className='absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white'>
+                  {cartTotal}
+                </span>
+              )}
+            </button>
             <span className='text-gray-700 dark:text-gray-200'>
               {userLabel}
             </span>

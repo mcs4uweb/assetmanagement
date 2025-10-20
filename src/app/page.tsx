@@ -195,7 +195,7 @@ export default function LandingPage() {
             <p className='text-gray-600 mb-4'>
               Ideal for businesses and power users.
             </p>
-            <p className='text-2xl font-bold mb-4 text-black'>$9.99/month</p>
+            <p className='text-2xl font-bold mb-4 text-black'>$1.99/month</p>
             <ul className='text-gray-600 mb-4 space-y-2'>
               <li>Unlimited assets</li>
               <li>AI-powered insights</li>
