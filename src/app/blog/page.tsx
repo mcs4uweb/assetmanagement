@@ -22,7 +22,7 @@ const articles: ArticleMeta[] = [
 export default function BlogIndexPage() {
   return (
     <Layout>
-      <div className='min-h-screen bg-gray-50'>
+      <div className='min-h-screen bg-gray-100'>
         <header className='bg-white shadow'>
           <div className='mx-auto max-w-7xl px-4 py-4'>
             <div className='flex items-center justify-between'>

@@ -100,6 +100,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     category: searchParams.get('category') ?? '',
     warranty: false,
     warrantyExpiry: '',
+    insuranceCompany: '',
+    insurancePolicyNumber: '',
+    insuranceExpirationDate: '',
   });
   const [quickInfoError, setQuickInfoError] = useState<string | null>(null);
   const [editingQuickInfoRowId, setEditingQuickInfoRowId] = useState<
@@ -229,6 +232,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       category: searchParams.get('category') ?? '',
       warranty: false,
       warrantyExpiry: '',
+      insuranceCompany: '',
+      insurancePolicyNumber: '',
+      insuranceExpirationDate: '',
     });
       setMaintenanceFormState([]);
       setEditingQuickInfoRowId(null);
@@ -280,6 +286,12 @@ export default function HomeDetailPage({ params }: PageProps) {
       warrantyExpiry:
         asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
           ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
+          : '',
+      insuranceCompany: asset.insuranceCompany ?? '',
+      insurancePolicyNumber: asset.insurancePolicyNumber ?? '',
+      insuranceExpirationDate:
+        asset.insuranceExpirationDate && !Number.isNaN(new Date(asset.insuranceExpirationDate as any).getTime())
+          ? new Date(asset.insuranceExpirationDate as any).toISOString().split('T')[0]
           : '',
     });
     const nextMaintenanceState = buildMaintenanceFormState(asset);
@@ -367,6 +379,12 @@ export default function HomeDetailPage({ params }: PageProps) {
         warrantyExpiry:
           formState.warrantyExpiry && !Number.isNaN(new Date(formState.warrantyExpiry).getTime())
             ? new Date(formState.warrantyExpiry).toISOString()
+            : undefined,
+        insuranceCompany: formState.insuranceCompany.trim(),
+        insurancePolicyNumber: formState.insurancePolicyNumber.trim(),
+        insuranceExpirationDate:
+          formState.insuranceExpirationDate && !Number.isNaN(new Date(formState.insuranceExpirationDate).getTime())
+            ? new Date(formState.insuranceExpirationDate).toISOString()
             : undefined,
       };
 
@@ -2405,22 +2423,22 @@ export default function HomeDetailPage({ params }: PageProps) {
                               />
                             </div>
                             <div>
-                              <label htmlFor='oilType' className='block text-sm font-medium text-gray-700'>
-                                Oil Type
-                              </label>
-                              <input
-                                id='oilType'
-                                name='oilType'
-                                value={formState.oilType}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='e.g. 5W-30 Synthetic'
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className='flex items-center gap-2'>
+                          <label htmlFor='oilType' className='block text-sm font-medium text-gray-700'>
+                            Oil Type
+                          </label>
+                          <input
+                            id='oilType'
+                            name='oilType'
+                            value={formState.oilType}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. 5W-30 Synthetic'
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className='flex items-center gap-2'>
                               <input
                                 id='warranty'
                                 name='warranty'
@@ -2448,6 +2466,45 @@ export default function HomeDetailPage({ params }: PageProps) {
                             </div>
                           </>
                         )}
+                        <div>
+                          <label htmlFor='insuranceCompany' className='block text-sm font-medium text-gray-700'>
+                            Insurance Company
+                          </label>
+                          <input
+                            id='insuranceCompany'
+                            name='insuranceCompany'
+                            value={formState.insuranceCompany}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. State Farm'
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor='insurancePolicyNumber' className='block text-sm font-medium text-gray-700'>
+                            Insurance Policy Number
+                          </label>
+                          <input
+                            id='insurancePolicyNumber'
+                            name='insurancePolicyNumber'
+                            value={formState.insurancePolicyNumber}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                            placeholder='e.g. ABC-1234567'
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor='insuranceExpirationDate' className='block text-sm font-medium text-gray-700'>
+                            Insurance Expiration Date
+                          </label>
+                          <input
+                            id='insuranceExpirationDate'
+                            name='insuranceExpirationDate'
+                            type='date'
+                            value={formState.insuranceExpirationDate}
+                            onChange={handleFieldChange}
+                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                          />
+                        </div>
                       </div>
 
                       {errorMessage && (
@@ -2478,6 +2535,17 @@ export default function HomeDetailPage({ params }: PageProps) {
                               tirePressure: asset.tirePressure ?? '',
                               oilType: asset.oilType ?? '',
                               category: asset.category ?? '',
+                              insuranceCompany: asset.insuranceCompany ?? '',
+                              insurancePolicyNumber: asset.insurancePolicyNumber ?? '',
+                              insuranceExpirationDate:
+                                asset.insuranceExpirationDate && !Number.isNaN(new Date(asset.insuranceExpirationDate as any).getTime())
+                                  ? new Date(asset.insuranceExpirationDate as any).toISOString().split('T')[0]
+                                  : '',
+                              warranty: Boolean(asset.warranty),
+                              warrantyExpiry:
+                                asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
+                                  ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
+                                  : '',
                             });
                           }}
                           className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100'

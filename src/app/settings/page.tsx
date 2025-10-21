@@ -128,7 +128,7 @@ const SettingsPage: React.FC = () => {
   if (loading || !currentUser) {
     return (
       <Layout>
-        <div className='flex min-h-screen items-center justify-center bg-gray-50'>
+        <div className='flex min-h-screen items-center justify-center bg-gray-100'>
           <div className='text-center'>
             <div className='mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600' />
             <p className='mt-4 text-gray-600'>Loading your settings...</p>
@@ -140,7 +140,7 @@ const SettingsPage: React.FC = () => {
 
   return (
     <Layout>
-      <div className='min-h-screen bg-gray-50 py-12'>
+      <div className='min-h-screen bg-gray-100 py-12'>
         <div className='mx-auto max-w-3xl px-4 sm:px-6 lg:px-8'>
           <header className='mb-8'>
             <p className='text-sm font-semibold uppercase tracking-wide text-blue-600'>

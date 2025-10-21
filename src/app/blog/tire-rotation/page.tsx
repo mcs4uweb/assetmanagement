@@ -7,7 +7,7 @@ import Layout from '../../../components/layout/Layout';
 export default function TireRotationArticle() {
   return (
     <Layout>
-      <div className='min-h-screen bg-gray-50'>
+      <div className='min-h-screen bg-gray-100'>
         <header className='bg-white shadow'>
           <div className='mx-auto max-w-3xl px-4 py-4'>
             <p className='text-xs uppercase tracking-wide text-gray-400'>Blog</p>

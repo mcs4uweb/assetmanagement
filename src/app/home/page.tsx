@@ -17,6 +17,8 @@ export default function HomePage() {
   const [assets, setAssets] = useState<Vehicle[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState('');
+  const [showInsuranceForm, setShowInsuranceForm] = useState(false);
+  const [showWarrantyForm, setShowWarrantyForm] = useState(false);
   const [formData, setFormData] = useState<Partial<Vehicle>>({
     make: '',
     model: '',
@@ -24,6 +26,11 @@ export default function HomePage() {
     vin: '',
     plate: '',
     tires: '',
+    insuranceCompany: '',
+    insurancePolicyNumber: '',
+    insuranceExpirationDate: '',
+    warrantyNumber: '',
+    warrantyExpiry: '',
   });
 
   // Years dropdown options from current year down to 1980
@@ -127,9 +134,12 @@ export default function HomePage() {
         UserId: currentUser.UserId,
         category: selectedAsset,
         key: newAssetRef.key ?? undefined,
+        warranty: Boolean((formData as any).warrantyNumber || (formData as any).warrantyExpiry),
       };
       await set(newAssetRef, newAsset);
       setShowForm(false);
+      setShowInsuranceForm(false);
+      setShowWarrantyForm(false);
       setFormData({
         make: '',
         model: '',
@@ -137,6 +147,11 @@ export default function HomePage() {
         vin: '',
         plate: '',
         tires: '',
+        insuranceCompany: '',
+        insurancePolicyNumber: '',
+        insuranceExpirationDate: '',
+        warrantyNumber: '',
+        warrantyExpiry: '',
       });
       setSelectedAsset('');
     } catch (error) {
@@ -169,7 +184,7 @@ export default function HomePage() {
 
   return (
     <Layout>
-      <div className='min-h-screen bg-gray-50'>
+      <div className='min-h-screen bg-gray-100'>
         <header className='bg-white shadow'>
           <div className='max-w-7xl mx-auto px-4 py-4 flex justify-between items-center'>
             <h1 className='text-2xl font-bold text-blue-600'>My Assets</h1>
@@ -254,6 +269,7 @@ export default function HomePage() {
                 <option value='household'>Household Item</option>
               </select>
 
+              {selectedAsset && (
               <form onSubmit={handleSubmit} className='space-y-4'>
                 <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                   <div>
@@ -307,19 +323,109 @@ export default function HomePage() {
                   </div>
                   {selectedAsset !== 'bike' && selectedAsset !== 'household' && (
                    <div>
-                      <label className='block text-sm font-medium text-gray-700'>
-                        VIN
-                      </label>
-                      <input
-                        type='text'
-                        name='vin'
-                        value={formData.vin}
-                        onChange={handleInputChange}
-                        required
-                        className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
-                      />
+                       <label className='block text-sm font-medium text-gray-700'>
+                         VIN
+                       </label>
+                       <input
+                         type='text'
+                         name='vin'
+                         value={formData.vin}
+                         onChange={handleInputChange}
+                         required
+                         className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                       />
+                     </div>
+                   )}
+                  <div className='md:col-span-2'>
+                    <div className='flex flex-wrap gap-3'>
+                      {!showInsuranceForm && (
+                        <button
+                          type='button'
+                          onClick={() => setShowInsuranceForm(true)}
+                          className='inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100'
+                        >
+                          Add Insurance
+                        </button>
+                      )}
+                      {!showWarrantyForm && (
+                        <button
+                          type='button'
+                          onClick={() => setShowWarrantyForm(true)}
+                          className='inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100'
+                        >
+                          Add Warranty
+                        </button>
+                      )}
                     </div>
-                  )}
+                    {showInsuranceForm && (
+                      <div className='mt-3 grid grid-cols-1 md:grid-cols-2 gap-4'>
+                        <div>
+                          <label className='block text-sm font-medium text-gray-700'>
+                            Insurance Company
+                          </label>
+                          <input
+                            type='text'
+                            name='insuranceCompany'
+                            value={formData.insuranceCompany ?? ''}
+                            onChange={handleInputChange}
+                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          />
+                        </div>
+                        <div>
+                          <label className='block text-sm font-medium text-gray-700'>
+                            Insurance Policy Number
+                          </label>
+                          <input
+                            type='text'
+                            name='insurancePolicyNumber'
+                            value={formData.insurancePolicyNumber ?? ''}
+                            onChange={handleInputChange}
+                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          />
+                        </div>
+                        <div>
+                          <label className='block text-sm font-medium text-gray-700'>
+                            Insurance Expiration Date
+                          </label>
+                          <input
+                            type='date'
+                            name='insuranceExpirationDate'
+                            value={(formData.insuranceExpirationDate as string) ?? ''}
+                            onChange={handleInputChange}
+                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {showWarrantyForm && (
+                      <div className='mt-3 grid grid-cols-1 md:grid-cols-2 gap-4'>
+                        <div>
+                          <label className='block text-sm font-medium text-gray-700'>
+                            Warranty Number
+                          </label>
+                          <input
+                            type='text'
+                            name='warrantyNumber'
+                            value={formData.warrantyNumber ?? ''}
+                            onChange={handleInputChange}
+                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          />
+                        </div>
+                        <div>
+                          <label className='block text-sm font-medium text-gray-700'>
+                            Warranty End Date
+                          </label>
+                          <input
+                            type='date'
+                            name='warrantyExpiry'
+                            value={(formData.warrantyExpiry as string) ?? ''}
+                            onChange={handleInputChange}
+                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className='flex space-x-4'>
                   <button
@@ -330,13 +436,14 @@ export default function HomePage() {
                   </button>
                   <button
                     type='button'
-                    onClick={() => setShowForm(false)}
+                    onClick={() => { setShowForm(false); setShowInsuranceForm(false); setShowWarrantyForm(false); }}
                     className='bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400'
                   >
                     Cancel
                   </button>
                 </div>
               </form>
+              )}
             </div>
           )}
 
@@ -350,7 +457,7 @@ export default function HomePage() {
                   {categoryLabel[category] ?? category}
                 </div>
               </div>
-              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
                 {items.map((asset) => (
                   <div
                     key={asset.key}
@@ -361,16 +468,16 @@ export default function HomePage() {
                         )}`
                       )
                     }
-                    className='bg-white rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow'
+                    className='bg-white rounded-md shadow-sm cursor-pointer hover:shadow transition-shadow'
                   >
-                    <div className='p-6'>
-                      <h3 className='text-lg font-semibold text-gray-900'>
+                    <div className='p-2'>
+                      <h3 className='text-base font-semibold text-gray-900'>
                         {asset.make}
                       </h3>
-                      <p className='text-gray-600'>
+                      <p className='text-sm text-gray-600'>
                         {asset.model} {asset.year}
                       </p>
-                      <div className='mt-2 text-sm text-gray-500'>
+                      <div className='mt-1 text-sm text-gray-500'>
                         <p>VIN: {asset.vin || 'Not set'}</p>
                         <p>Plate: {asset.plate || 'Not set'}</p>
                       </div>

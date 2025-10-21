@@ -89,7 +89,7 @@ const ProfilePage: React.FC = () => {
   if (loading || !currentUser) {
     return (
       <Layout>
-        <div className='flex min-h-screen items-center justify-center bg-gray-50'>
+        <div className='flex min-h-screen items-center justify-center bg-gray-100'>
           <div className='text-center'>
             <div className='mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600' />
             <p className='mt-4 text-gray-600'>Loading your profile...</p>
@@ -101,7 +101,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <Layout>
-      <div className='min-h-screen bg-gray-50 py-10'>
+      <div className='min-h-screen bg-gray-100 py-10'>
         <div className='mx-auto max-w-3xl px-6'>
           <div className='mb-8 text-center'>
             <h1 className='text-3xl font-bold text-gray-900'>Your Profile</h1>
@@ -277,4 +277,3 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
-
