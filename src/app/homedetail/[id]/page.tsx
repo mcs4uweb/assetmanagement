@@ -19,7 +19,7 @@ import {
 } from '@tanstack/react-table';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { onValue, ref, remove, set } from 'firebase/database';
+import { onValue, ref, remove, set, update } from 'firebase/database';
 import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
@@ -99,6 +99,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     oilType: '',
     category: searchParams.get('category') ?? '',
     warranty: false,
+    warrantyNumber: '',
+    warrantyPhone: '',
+    warrantyNotes: '',
     warrantyExpiry: '',
     insuranceCompany: '',
     insurancePolicyNumber: '',
@@ -231,6 +234,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       oilType: '',
       category: searchParams.get('category') ?? '',
       warranty: false,
+      warrantyNumber: '',
+      warrantyPhone: '',
+      warrantyNotes: '',
       warrantyExpiry: '',
       insuranceCompany: '',
       insurancePolicyNumber: '',
@@ -283,6 +289,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       oilType: asset.oilType ?? '',
       category: asset.category ?? searchParams.get('category') ?? '',
       warranty: Boolean(asset.warranty),
+      warrantyNumber: asset.warrantyNumber ?? '',
+      warrantyPhone: asset.warrantyPhone ?? '',
+      warrantyNotes: asset.warrantyNotes ?? '',
       warrantyExpiry:
         asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
           ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
@@ -363,11 +372,18 @@ export default function HomeDetailPage({ params }: PageProps) {
     try {
       const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
 
-      const updatedAsset: Vehicle = {
-        ...asset,
+      // Build a shallow patch and use update() to avoid overwriting unrelated fields.
+      const toIsoOrNull = (v: string): string | null => {
+        if (!v) return null;
+        const d = new Date(v);
+        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+      };
+
+      const warrantyOn = Boolean(formState.warranty);
+      const patch: Record<string, unknown> = {
         make: formState.make.trim(),
         model: formState.model.trim(),
-        year: formState.year ? Number(formState.year) : undefined,
+        year: formState.year ? Number(formState.year) : null,
         vin: formState.vin.trim(),
         plate: formState.plate.trim(),
         tires: formState.tires.trim(),
@@ -375,21 +391,17 @@ export default function HomeDetailPage({ params }: PageProps) {
         tirePressure: formState.tirePressure.trim(),
         oilType: formState.oilType.trim(),
         category: formState.category.trim(),
-        warranty: Boolean(formState.warranty),
-        warrantyExpiry:
-          formState.warrantyExpiry && !Number.isNaN(new Date(formState.warrantyExpiry).getTime())
-            ? new Date(formState.warrantyExpiry).toISOString()
-            : undefined,
+        warranty: warrantyOn,
+        warrantyNumber: warrantyOn ? (formState.warrantyNumber.trim() || null) : null,
+        warrantyPhone: warrantyOn ? (formState.warrantyPhone.trim() || null) : null,
+        warrantyNotes: warrantyOn ? (formState.warrantyNotes.trim() || null) : null,
+        warrantyExpiry: warrantyOn ? toIsoOrNull(formState.warrantyExpiry) : null,
         insuranceCompany: formState.insuranceCompany.trim(),
         insurancePolicyNumber: formState.insurancePolicyNumber.trim(),
-        insuranceExpirationDate:
-          formState.insuranceExpirationDate && !Number.isNaN(new Date(formState.insuranceExpirationDate).getTime())
-            ? new Date(formState.insuranceExpirationDate).toISOString()
-            : undefined,
+        insuranceExpirationDate: toIsoOrNull(formState.insuranceExpirationDate),
       };
 
-      const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
-      await set(targetRef, sanitizedAsset);
+      await update(targetRef, patch);
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to update asset', error);
@@ -1314,6 +1326,20 @@ export default function HomeDetailPage({ params }: PageProps) {
       return todayTs > nextTs;
     };
 
+    // Determine the latest raw date per source to avoid flagging older rows
+    const latestRawBySource: Record<'odometer' | 'oilChange', string | undefined> = {
+      odometer: undefined,
+      oilChange: undefined,
+    };
+    for (const r of quickInfoRows) {
+      const raw = r.rawDate;
+      if (!raw) continue;
+      const prev = latestRawBySource[r.source];
+      if (!prev || raw > prev) {
+        latestRawBySource[r.source] = raw;
+      }
+    }
+
     return [
       {
         accessorKey: 'event',
@@ -1441,7 +1467,9 @@ export default function HomeDetailPage({ params }: PageProps) {
             : row.original.rawDate;
           const display = formatNextActionDate(baseRaw);
           const overdue = isNextActionDateOverdue(baseRaw);
-          if (overdue && display !== 'N/A') {
+          const isLatestForSource = !!baseRaw && baseRaw === latestRawBySource[row.original.source];
+          const shouldWarn = overdue && display !== 'N/A' && isLatestForSource;
+          if (shouldWarn) {
             return (
               <span className='inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700'>
                 {display}
@@ -1532,6 +1560,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     quickInfoRowDraft.reading,
     saveQuickInfoRow,
     startEditingQuickInfoRow,
+    quickInfoRows,
   ]);
 
   const detailEntries = useMemo(() => {
@@ -1585,22 +1614,37 @@ export default function HomeDetailPage({ params }: PageProps) {
           warrantyExpiry = d.toLocaleDateString();
         }
       }
-      entries.push(
-        {
-          label: 'Under Warranty',
-          value: warrantyValue,
-          column: 'primary',
-          placeholder: 'Not set',
-          alwaysShow: true,
-        },
-        {
+      entries.push({
+        label: 'Under Warranty',
+        value: warrantyValue,
+        column: 'primary',
+        placeholder: 'Not set',
+        alwaysShow: true,
+      });
+      if (asset.warranty) {
+        if (asset.warrantyPhone) {
+          entries.push({
+            label: 'Warranty Phone',
+            value: normalizeValue(asset.warrantyPhone),
+            column: 'primary',
+            placeholder: 'Not set',
+          });
+        }
+        entries.push({
           label: 'Warranty Expiry',
           value: warrantyExpiry,
           column: 'primary',
           placeholder: 'Not set',
-          alwaysShow: true,
-        },
-      );
+        });
+        if (asset.warrantyNotes) {
+          entries.push({
+            label: 'Warranty Notes',
+            value: normalizeValue(asset.warrantyNotes),
+            column: 'primary',
+            placeholder: 'Not set',
+          });
+        }
+      }
     }
 
     entries.push(
@@ -2451,6 +2495,38 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 Under Warranty
                               </label>
                             </div>
+                            {formState.warranty && (
+                            <div>
+                              <label htmlFor='warrantyNumber' className='block text-sm font-medium text-gray-700'>
+                                Warranty Number
+                              </label>
+                              <input
+                                id='warrantyNumber'
+                                name='warrantyNumber'
+                                value={formState.warrantyNumber}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. ABC-1234567'
+                              />
+                            </div>
+                            )}
+                            {formState.warranty && (
+                            <div>
+                              <label htmlFor='warrantyPhone' className='block text-sm font-medium text-gray-700'>
+                                Warranty Phone
+                              </label>
+                              <input
+                                id='warrantyPhone'
+                                name='warrantyPhone'
+                                type='tel'
+                                value={formState.warrantyPhone}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. (800) 555-1234'
+                              />
+                            </div>
+                            )}
+                            {formState.warranty && (
                             <div>
                               <label htmlFor='warrantyExpiry' className='block text-sm font-medium text-gray-700'>
                                 Warranty Expiry
@@ -2464,6 +2540,102 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
+                            )}
+                            {formState.warranty && (
+                            <div className='sm:col-span-2'>
+                              <label htmlFor='warrantyNotes' className='block text-sm font-medium text-gray-700'>
+                                Warranty Notes
+                              </label>
+                              <textarea
+                                id='warrantyNotes'
+                                name='warrantyNotes'
+                                rows={3}
+                                value={formState.warrantyNotes}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='Any additional warranty details'
+                              />
+                            </div>
+                            )}
+                          </>
+                        )}
+                        {formState.category.trim().toLowerCase() !== 'household' && (
+                          <>
+                            <div className='flex items-center gap-2'>
+                              <input
+                                id='warranty'
+                                name='warranty'
+                                type='checkbox'
+                                checked={formState.warranty}
+                                onChange={(e) => setFormState((prev) => ({ ...prev, warranty: e.target.checked }))}
+                                className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                              />
+                              <label htmlFor='warranty' className='text-sm font-medium text-gray-700'>
+                                Under Warranty
+                              </label>
+                            </div>
+                            {formState.warranty && (
+                            <div>
+                              <label htmlFor='warrantyNumber' className='block text-sm font-medium text-gray-700'>
+                                Warranty Number
+                              </label>
+                              <input
+                                id='warrantyNumber'
+                                name='warrantyNumber'
+                                value={formState.warrantyNumber}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. ABC-1234567'
+                              />
+                            </div>
+                            )}
+                            {formState.warranty && (
+                            <div>
+                              <label htmlFor='warrantyPhone' className='block text-sm font-medium text-gray-700'>
+                                Warranty Phone
+                              </label>
+                              <input
+                                id='warrantyPhone'
+                                name='warrantyPhone'
+                                type='tel'
+                                value={formState.warrantyPhone}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='e.g. (800) 555-1234'
+                              />
+                            </div>
+                            )}
+                            {formState.warranty && (
+                            <div>
+                              <label htmlFor='warrantyExpiry' className='block text-sm font-medium text-gray-700'>
+                                Warranty Expiry
+                              </label>
+                              <input
+                                id='warrantyExpiry'
+                                name='warrantyExpiry'
+                                type='date'
+                                value={formState.warrantyExpiry}
+                                onChange={(e) => setFormState((prev) => ({ ...prev, warrantyExpiry: e.target.value }))}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                              />
+                            </div>
+                            )}
+                            {formState.warranty && (
+                            <div className='sm:col-span-2'>
+                              <label htmlFor='warrantyNotes' className='block text-sm font-medium text-gray-700'>
+                                Warranty Notes
+                              </label>
+                              <textarea
+                                id='warrantyNotes'
+                                name='warrantyNotes'
+                                rows={3}
+                                value={formState.warrantyNotes}
+                                onChange={handleFieldChange}
+                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                placeholder='Any additional warranty details'
+                              />
+                            </div>
+                            )}
                           </>
                         )}
                         <div>
@@ -2535,6 +2707,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                               tirePressure: asset.tirePressure ?? '',
                               oilType: asset.oilType ?? '',
                               category: asset.category ?? '',
+                              warrantyNumber: asset.warrantyNumber ?? '',
+                              warrantyPhone: asset.warrantyPhone ?? '',
+                              warrantyNotes: asset.warrantyNotes ?? '',
                               insuranceCompany: asset.insuranceCompany ?? '',
                               insurancePolicyNumber: asset.insurancePolicyNumber ?? '',
                               insuranceExpirationDate:

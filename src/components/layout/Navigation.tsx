@@ -270,6 +270,32 @@ const Navigation: React.FC = () => {
                     Profile
                   </button>
                   <button
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    router.push('/payment');
+                  }}
+                    className='flex w-full items-center px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700'
+                    role='menuitem'
+                  >
+                    <span className='mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-green-50 text-green-600 dark:bg-green-900 dark:text-green-200'>
+                      <svg
+                        xmlns='http://www.w3.org/2000/svg'
+                        viewBox='0 0 24 24'
+                        fill='none'
+                        stroke='currentColor'
+                        strokeWidth={1.5}
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        className='h-4 w-4'
+                      >
+                        <path d='M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4' />
+                        <polyline points='7 10 12 15 17 10' />
+                        <line x1='12' y1='15' x2='12' y2='3' />
+                      </svg>
+                    </span>
+                    Payment
+                  </button>
+                  <button
                     onClick={() => {
                       handleThemeToggle();
                       setIsProfileMenuOpen(false);
@@ -386,6 +412,15 @@ const Navigation: React.FC = () => {
                   className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                 >
                   Profile
+                </button>
+                <button
+                  onClick={() => {
+                    router.push('/payment');
+                    setIsMenuOpen(false);
+                  }}
+                  className='block w-full rounded-md px-3 py-2 text-left text-base text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100'
+                >
+                  Payment
                 </button>
                 <button
                   onClick={() => {

@@ -14,6 +14,8 @@ export interface Vehicle {
   oilType?: string
   warranty?: boolean
   warrantyNumber?: string
+  warrantyPhone?: string
+  warrantyNotes?: string
   warrantyExpiry?: Date | string
   purchaseDate?: Date
   parcelNumber?: string

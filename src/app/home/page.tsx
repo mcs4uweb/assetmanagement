@@ -6,9 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
 import { Vehicle } from '../../models/Vehicle';
-import { ref, onValue, push, set } from 'firebase/database';
+import { ref, onValue, push, set, update } from 'firebase/database';
 import { db } from '../../lib/firebase';
 import Layout from '../../components/layout/Layout';
+import { Pencil } from 'lucide-react';
 
 export default function HomePage() {
   const { currentUser, loading } = useAuth();
@@ -19,6 +20,10 @@ export default function HomePage() {
   const [selectedAsset, setSelectedAsset] = useState('');
   const [showInsuranceForm, setShowInsuranceForm] = useState(false);
   const [showWarrantyForm, setShowWarrantyForm] = useState(false);
+  const [editingOdometerFor, setEditingOdometerFor] = useState<string | null>(null);
+  const [odometerDraft, setOdometerDraft] = useState<{ reading: string; date: string }>({ reading: '', date: '' });
+  const [isSavingOdometer, setIsSavingOdometer] = useState(false);
+  const [odometerError, setOdometerError] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Vehicle>>({
     make: '',
     model: '',
@@ -29,7 +34,10 @@ export default function HomePage() {
     insuranceCompany: '',
     insurancePolicyNumber: '',
     insuranceExpirationDate: '',
+    warranty: false,
     warrantyNumber: '',
+    warrantyPhone: '',
+    warrantyNotes: '',
     warrantyExpiry: '',
   });
 
@@ -134,7 +142,7 @@ export default function HomePage() {
         UserId: currentUser.UserId,
         category: selectedAsset,
         key: newAssetRef.key ?? undefined,
-        warranty: Boolean((formData as any).warrantyNumber || (formData as any).warrantyExpiry),
+        warranty: Boolean((formData as any).warranty),
       };
       await set(newAssetRef, newAsset);
       setShowForm(false);
@@ -150,7 +158,10 @@ export default function HomePage() {
         insuranceCompany: '',
         insurancePolicyNumber: '',
         insuranceExpirationDate: '',
+        warranty: false,
         warrantyNumber: '',
+        warrantyPhone: '',
+        warrantyNotes: '',
         warrantyExpiry: '',
       });
       setSelectedAsset('');
@@ -167,6 +178,92 @@ export default function HomePage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Helper to compute the latest odometer entry for a card
+  const formatLatestOdometer = (
+    a: Vehicle
+  ): { number: string; date?: string; dateMs?: number } | null => {
+    const entries = Array.isArray(a.odometer) ? a.odometer : [];
+    if (entries.length === 0) return null;
+    let latestIndex = -1;
+    let latestTs = -Infinity;
+    for (let i = 0; i < entries.length; i += 1) {
+      const e = entries[i] as any;
+      const raw = e?.date ?? e?.reading;
+      const ts = raw ? new Date(raw as any).getTime() : NaN;
+      const safeTs = Number.isNaN(ts) ? -Infinity : ts;
+      if (safeTs > latestTs) {
+        latestTs = safeTs;
+        latestIndex = i;
+      }
+    }
+    const chosen = entries[latestIndex] as any;
+    if (!chosen || typeof chosen.odometer !== 'number' || !Number.isFinite(chosen.odometer)) return null;
+    const number = new Intl.NumberFormat().format(chosen.odometer as number);
+    let date: string | undefined;
+    let dateMs: number | undefined;
+    const raw = chosen?.date ?? chosen?.reading;
+    if (raw) {
+      const d = new Date(raw as any);
+      if (!Number.isNaN(d.getTime())) {
+        date = d.toLocaleDateString();
+        dateMs = d.getTime();
+      }
+    }
+    return { number, date, dateMs };
+  };
+
+  const openOdometerEditor = (asset: Vehicle) => {
+    const today = new Date().toISOString().split('T')[0];
+    setEditingOdometerFor(asset.key || null);
+    setOdometerDraft({ reading: '', date: today });
+    setOdometerError(null);
+  };
+
+  const cancelOdometerEdit = () => {
+    if (isSavingOdometer) return;
+    setEditingOdometerFor(null);
+    setOdometerDraft({ reading: '', date: '' });
+    setOdometerError(null);
+  };
+
+  const handleOdometerSave = async (asset: Vehicle) => {
+    if (!currentUser?.UserId || !asset?.key) return;
+
+    const readingTrim = odometerDraft.reading.trim();
+    const dateTrim = odometerDraft.date.trim();
+
+    if (!readingTrim) {
+      setOdometerError('Please enter the odometer reading.');
+      return;
+    }
+    const readingNum = Number(readingTrim);
+    if (!Number.isFinite(readingNum)) {
+      setOdometerError('Odometer reading must be a valid number.');
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateTrim)) {
+      setOdometerError('Please provide a valid date.');
+      return;
+    }
+    const isoDate = `${dateTrim}T00:00:00.000Z`;
+
+    try {
+      setIsSavingOdometer(true);
+      setOdometerError(null);
+      const targetRef = ref(db, `assets/${currentUser.UserId}/${asset.key}`);
+      const prior = Array.isArray(asset.odometer) ? asset.odometer : [];
+      const next = [...prior, { odometer: readingNum, date: isoDate }];
+      await update(targetRef, { odometer: next });
+      setEditingOdometerFor(null);
+      setOdometerDraft({ reading: '', date: '' });
+    } catch (err) {
+      console.error('Failed to save odometer', err);
+      setOdometerError('Unable to save odometer reading. Please try again.');
+    } finally {
+      setIsSavingOdometer(false);
+    }
   };
 
   if (loading || !currentUser) {
@@ -399,30 +496,78 @@ export default function HomePage() {
                     )}
                     {showWarrantyForm && (
                       <div className='mt-3 grid grid-cols-1 md:grid-cols-2 gap-4'>
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700'>
-                            Warranty Number
-                          </label>
+                        <div className='flex items-center gap-2 md:col-span-2'>
                           <input
-                            type='text'
-                            name='warrantyNumber'
-                            value={formData.warrantyNumber ?? ''}
-                            onChange={handleInputChange}
-                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                            id='warranty'
+                            name='warranty'
+                            type='checkbox'
+                            checked={Boolean(formData.warranty)}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                warranty: e.target.checked,
+                              }))
+                            }
+                            className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
                           />
-                        </div>
-                        <div>
-                          <label className='block text-sm font-medium text-gray-700'>
-                            Warranty End Date
+                          <label htmlFor='warranty' className='text-sm font-medium text-gray-700'>
+                            Under Warranty
                           </label>
-                          <input
-                            type='date'
-                            name='warrantyExpiry'
-                            value={(formData.warrantyExpiry as string) ?? ''}
-                            onChange={handleInputChange}
-                            className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
-                          />
                         </div>
+                        {formData.warranty && (
+                          <>
+                            <div>
+                              <label className='block text-sm font-medium text-gray-700'>
+                                Warranty Number
+                              </label>
+                              <input
+                                type='text'
+                                name='warrantyNumber'
+                                value={formData.warrantyNumber ?? ''}
+                                onChange={handleInputChange}
+                                className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                              />
+                            </div>
+                            <div>
+                              <label className='block text-sm font-medium text-gray-700'>
+                                Warranty Phone Number
+                              </label>
+                              <input
+                                type='tel'
+                                name='warrantyPhone'
+                                value={formData.warrantyPhone ?? ''}
+                                onChange={handleInputChange}
+                                className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                                placeholder='e.g. (800) 555-1234'
+                              />
+                            </div>
+                            <div className='md:col-span-2'>
+                              <label className='block text-sm font-medium text-gray-700'>
+                                Warranty Notes
+                              </label>
+                              <textarea
+                                name='warrantyNotes'
+                                value={formData.warrantyNotes ?? ''}
+                                onChange={handleInputChange}
+                                rows={3}
+                                className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                                placeholder='Any additional warranty details'
+                              />
+                            </div>
+                            <div>
+                              <label className='block text-sm font-medium text-gray-700'>
+                                Warranty End Date
+                              </label>
+                              <input
+                                type='date'
+                                name='warrantyExpiry'
+                                value={(formData.warrantyExpiry as string) ?? ''}
+                                onChange={handleInputChange}
+                                className='mb-4 w-full rounded border border-gray-300 bg-white p-2 text-black focus:border-blue-500 focus:bg-white focus:text-black focus:outline-none focus:ring-1 focus:ring-blue-500'
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -471,16 +616,109 @@ export default function HomePage() {
                     className='bg-white rounded-md shadow-sm cursor-pointer hover:shadow transition-shadow'
                   >
                     <div className='p-2'>
-                      <h3 className='text-base font-semibold text-gray-900'>
-                        {asset.make}
-                      </h3>
-                      <p className='text-sm text-gray-600'>
-                        {asset.model} {asset.year}
-                      </p>
+                      <div className='flex items-start justify-between'>
+                        <div>
+                          <h3 className='text-base font-semibold text-gray-900'>
+                            {asset.make}
+                          </h3>
+                          <p className='text-sm text-gray-600'>
+                            {asset.model} {asset.year}
+                          </p>
+                        </div>
+                        {category === 'vehicle' && (
+                          <button
+                            type='button'
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openOdometerEditor(asset);
+                            }}
+                            className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100'
+                            aria-label='Edit current odometer'
+                            title='Edit current odometer'
+                          >
+                            <Pencil className='w-4 h-4' />
+                          </button>
+                        )}
+                      </div>
                       <div className='mt-1 text-sm text-gray-500'>
                         <p>VIN: {asset.vin || 'Not set'}</p>
                         <p>Plate: {asset.plate || 'Not set'}</p>
+                        {(() => {
+                          const latest = formatLatestOdometer(asset);
+                          if (!latest) return null;
+                          const ninety = 90 * 24 * 60 * 60 * 1000;
+                          const stale = latest.dateMs !== undefined && Date.now() - latest.dateMs > ninety;
+                          return (
+                            <>
+                              <p>
+                                Odometer: {latest.number}
+                                {latest.date ? ` (${latest.date})` : ''}
+                              </p>
+                              {category === 'vehicle' && stale && (
+                                <p className='text-xs text-red-600 mt-1'>
+                                  Odometer reading is older than 90 days. Please update.
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
+                      {category === 'vehicle' && editingOdometerFor === asset.key && (
+                        <form
+                          onClick={(e) => e.stopPropagation()}
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void handleOdometerSave(asset);
+                          }}
+                          className='mt-2 space-y-2 border-t border-gray-200 pt-2'
+                        >
+                          <div className='grid grid-cols-1 gap-2'>
+                            <div>
+                              <label className='block text-xs font-medium text-gray-700'>Current Odometer</label>
+                              <input
+                                type='number'
+                                inputMode='numeric'
+                                value={odometerDraft.reading}
+                                onChange={(e) => setOdometerDraft((p) => ({ ...p, reading: e.target.value }))}
+                                className='mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900'
+                                placeholder='e.g. 45231'
+                              />
+                            </div>
+                            <div>
+                              <label className='block text-xs font-medium text-gray-700'>Date of Reading</label>
+                              <input
+                                type='date'
+                                value={odometerDraft.date}
+                                onChange={(e) => setOdometerDraft((p) => ({ ...p, date: e.target.value }))}
+                                className='mt-1 w-full rounded border border-gray-300 bg-white p-2 text-sm text-gray-900'
+                              />
+                            </div>
+                          </div>
+                          {odometerError && (
+                            <p className='text-xs text-red-600'>{odometerError}</p>
+                          )}
+                          <div className='flex gap-2'>
+                            <button
+                              type='submit'
+                              disabled={isSavingOdometer}
+                              className='inline-flex items-center rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60'
+                            >
+                              {isSavingOdometer ? 'Saving...' : 'Save'}
+                            </button>
+                            <button
+                              type='button'
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                cancelOdometerEdit();
+                              }}
+                              className='inline-flex items-center rounded border border-gray-300 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-100'
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      )}
                     </div>
                   </div>
                 ))}

@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { onValue, ref } from 'firebase/database';
+import { onValue, ref, query, orderByChild, equalTo } from 'firebase/database';
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
@@ -24,6 +24,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { currentUser, loading } = useAuth();
   const [assets, setAssets] = useState<Vehicle[]>([]);
+  const [noOdometerAssets, setNoOdometerAssets] = useState<Vehicle[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [dismissModal, setDismissModal] = useState<{
     open: boolean;
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!currentUser) {
       setAssets([]);
+      setNoOdometerAssets([]);
       return;
     }
 
@@ -51,7 +53,22 @@ export default function DashboardPage() {
       }
     });
 
-    return () => unsubscribe();
+    // Query for assets missing odometer field directly from Firebase
+    const q = query(assetsRef, orderByChild('odometer'), equalTo(null));
+    const unsubscribeNoOdo = onValue(q, (snapshot: any) => {
+      const data = snapshot.val();
+      if (data) {
+        const list: Vehicle[] = Object.keys(data).map((key) => ({ key, ...data[key] }));
+        setNoOdometerAssets(list);
+      } else {
+        setNoOdometerAssets([]);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeNoOdo();
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -133,6 +150,63 @@ export default function DashboardPage() {
 
     return { warrantyExpiring, upcomingMaintenance };
   }, [assets]);
+
+  const noOdometerVehicles = useMemo(() => {
+    return (noOdometerAssets || []).filter(
+      (a) => (a.category || '').toString().trim().toLowerCase() === 'vehicle'
+    );
+  }, [noOdometerAssets]);
+
+  const staleOdometerVehicles = useMemo(() => {
+    const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+    const isVehicle = (a: Vehicle) =>
+      (a.category || '').toString().trim().toLowerCase() === 'vehicle';
+    const latestDateMs = (a: Vehicle): number | null => {
+      const entries = Array.isArray(a.odometer) ? a.odometer : [];
+      if (entries.length === 0) return null;
+      let latest = Number.NEGATIVE_INFINITY;
+      for (const e of entries) {
+        const raw = (e as any)?.date ?? (e as any)?.reading;
+        const ts = raw ? new Date(raw as any).getTime() : NaN;
+        if (!Number.isNaN(ts) && ts > latest) latest = ts;
+      }
+      return Number.isFinite(latest) ? latest : null;
+    };
+
+    return assets.filter((a) => {
+      if (!isVehicle(a)) return false;
+      const ms = latestDateMs(a);
+      if (ms === null) return false; // handled by noOdometerVehicles instead
+      return Date.now() - ms > ninetyDaysMs;
+    });
+  }, [assets]);
+
+  const missingOrStaleVehicles = useMemo(() => {
+    const byKey: Record<string, { asset: Vehicle; stale: boolean; lastDate?: string }> = {};
+    for (const a of noOdometerVehicles) {
+      if (!a.key) continue;
+      byKey[a.key] = { asset: a, stale: false };
+    }
+    for (const a of staleOdometerVehicles) {
+      if (!a.key) continue;
+      // compute last date string
+      let lastDate: string | undefined;
+      const entries = Array.isArray(a.odometer) ? a.odometer : [];
+      let latest = Number.NEGATIVE_INFINITY;
+      for (const e of entries) {
+        const raw = (e as any)?.date ?? (e as any)?.reading;
+        const ts = raw ? new Date(raw as any).getTime() : NaN;
+        if (!Number.isNaN(ts) && ts > latest) {
+          latest = ts;
+        }
+      }
+      if (Number.isFinite(latest)) {
+        lastDate = new Date(latest).toLocaleDateString();
+      }
+      byKey[a.key] = { asset: a, stale: true, lastDate };
+    }
+    return Object.values(byKey);
+  }, [noOdometerVehicles, staleOdometerVehicles]);
 
   // Mock sample data when there are no real items
   const sampleWarrantyExpiring: DashboardItem[] = useMemo(
@@ -280,7 +354,7 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <main className='mx-auto max-w-7xl px-3 py-4 flex flex-col gap-4 md:flex-row'>
+        <main className='mx-auto max-w-7xl px-3 py-4 flex flex-col gap-4 md:flex-row md:flex-wrap'>
           <section className='w-full md:w-1/2 rounded-lg bg-white p-3 md:p-4 shadow-sm'>
             <div className='mb-2 flex items-center justify-between'>
               <h2 className='text-lg font-semibold text-gray-900'>
@@ -462,6 +536,51 @@ export default function DashboardPage() {
                             days
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className='w-full md:w-full rounded-lg bg-white p-3 md:p-4 shadow-sm'>
+            <div className='mb-2 flex items-center justify-between'>
+              <h2 className='text-lg font-semibold text-gray-900'>
+                Vehicles Missing or Stale Odometer Reading
+              </h2>
+              <div className='flex items-center gap-3'>
+                <span className='text-xs text-gray-500'>Filtered from database</span>
+              </div>
+            </div>
+            {missingOrStaleVehicles.length === 0 ? (
+              <p className='text-sm text-gray-600'>
+                All vehicles have a recent odometer reading.
+              </p>
+            ) : (
+              <ul className='divide-y divide-gray-200'>
+                {missingOrStaleVehicles.map(({ asset: a, stale, lastDate }) => (
+                  <li key={a.key} className='py-2'>
+                    <div className='flex items-center justify-between gap-4'>
+                      <Link
+                        href={`/homedetail/${a.key}`}
+                        className='font-medium text-blue-600 hover:text-blue-700'
+                      >
+                        {labelForAsset(a)}
+                      </Link>
+                      <div className='flex items-center gap-3'>
+                        {stale ? (
+                          <span className='text-xs text-red-600'>
+                            Last reading older than 90 days{lastDate ? ` (${lastDate})` : ''}
+                          </span>
+                        ) : (
+                          <span className='text-xs text-gray-600'>No odometer readings</span>
+                        )}
+                        <Link
+                          href={`/homedetail/${a.key}`}
+                          className='inline-flex items-center rounded-md border border-blue-400 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50'
+                        >
+                          {stale ? 'Update Reading' : 'Add Reading'}
+                        </Link>
                       </div>
                     </div>
                   </li>

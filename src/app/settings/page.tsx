@@ -18,6 +18,9 @@ const SettingsPage: React.FC = () => {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [isProModalOpen, setIsProModalOpen] = useState(false);
+  const [odometerWarningDays, setOdometerWarningDays] = useState<number>(90);
+  const [proModalSource, setProModalSource] = useState<'ai' | 'cloud' | 'cta' | null>(null);
+  const [prevProState, setPrevProState] = useState<{ ai: boolean; cloud: boolean }>({ ai: false, cloud: false });
   const TEAM_LIMIT = 2;
 
   useEffect(() => {
@@ -40,6 +43,13 @@ const SettingsPage: React.FC = () => {
         if (Array.isArray(parsed.teamMembers)) {
           setTeamMembers(parsed.teamMembers);
         }
+        if (
+          typeof parsed.odometerWarningDays === 'number' &&
+          Number.isFinite(parsed.odometerWarningDays) &&
+          parsed.odometerWarningDays > 0
+        ) {
+          setOdometerWarningDays(parsed.odometerWarningDays);
+        }
       }
     } catch (error) {
       console.error('Unable to load settings from localStorage', error);
@@ -57,6 +67,7 @@ const SettingsPage: React.FC = () => {
       proAiEnabled,
       cloudBackupEnabled,
       teamMembers,
+      odometerWarningDays,
     };
 
     try {
@@ -64,7 +75,7 @@ const SettingsPage: React.FC = () => {
     } catch (error) {
       console.error('Unable to save settings to localStorage', error);
     }
-  }, [proAiEnabled, cloudBackupEnabled, preferencesLoaded]);
+  }, [proAiEnabled, cloudBackupEnabled, odometerWarningDays, preferencesLoaded]);
 
   const isFreeTierLimitReached = teamMembers.length >= TEAM_LIMIT;
 
@@ -109,6 +120,8 @@ const SettingsPage: React.FC = () => {
     setProAiEnabled((prev) => {
       const next = !prev;
       if (!prev && next) {
+        setPrevProState({ ai: prev, cloud: cloudBackupEnabled });
+        setProModalSource('ai');
         setIsProModalOpen(true);
       }
       return next;
@@ -119,6 +132,8 @@ const SettingsPage: React.FC = () => {
     setCloudBackupEnabled((prev) => {
       const next = !prev;
       if (!prev && next) {
+        setPrevProState({ ai: proAiEnabled, cloud: prev });
+        setProModalSource('cloud');
         setIsProModalOpen(true);
       }
       return next;
@@ -243,6 +258,49 @@ const SettingsPage: React.FC = () => {
           <section className='mt-8 rounded-2xl bg-white shadow-sm ring-1 ring-gray-100'>
             <div className='border-b border-gray-100 px-6 py-5'>
               <h2 className='text-lg font-semibold text-gray-900'>
+                Vehicle Preferences
+              </h2>
+              <p className='mt-1 text-sm text-gray-500'>
+                Control thresholds used to remind you about odometer updates.
+              </p>
+            </div>
+
+            <div className='px-6 py-6'>
+              <label
+                htmlFor='odo-warning-days'
+                className='block text-sm font-medium text-gray-700'
+              >
+                Number of days before your last odometer reading
+              </label>
+              <div className='mt-1 flex items-center gap-3'>
+                <input
+                  id='odo-warning-days'
+                  type='number'
+                  inputMode='numeric'
+                  min={1}
+                  max={3650}
+                  value={odometerWarningDays}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (!Number.isFinite(n)) return;
+                    const clamped = Math.min(3650, Math.max(1, Math.trunc(n)));
+                    setOdometerWarningDays(clamped);
+                  }}
+                  className='w-32 rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+                />
+                <span className='text-sm text-gray-500'>
+                  Default is 90 days
+                </span>
+              </div>
+              <p className='mt-2 text-xs text-gray-500'>
+                When the most recent odometer entry is older than this value, we will highlight it as stale.
+              </p>
+            </div>
+          </section>
+
+          <section className='mt-8 rounded-2xl bg-white shadow-sm ring-1 ring-gray-100'>
+            <div className='border-b border-gray-100 px-6 py-5'>
+              <h2 className='text-lg font-semibold text-gray-900'>
                 Team Collaboration
               </h2>
               <p className='mt-1 text-sm text-gray-500'>
@@ -314,7 +372,7 @@ const SettingsPage: React.FC = () => {
                   </button>
                   <button
                     type='button'
-                    onClick={() => setIsProModalOpen(true)}
+                    onClick={() => { setPrevProState({ ai: proAiEnabled, cloud: cloudBackupEnabled }); setProModalSource('cta'); setIsProModalOpen(true); }}
                     className='inline-flex items-center justify-center rounded-md border border-blue-600 px-4 py-2 text-sm font-semibold text-blue-600 transition hover:bg-blue-50'
                   >
                     Go Pro
@@ -357,7 +415,13 @@ const SettingsPage: React.FC = () => {
             <div className='mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end'>
               <button
                 type='button'
-                onClick={() => setIsProModalOpen(false)}
+                onClick={() => {
+                  // Revert any Pro toggles that were turned on when opening the modal
+                  setProAiEnabled(prevProState.ai);
+                  setCloudBackupEnabled(prevProState.cloud);
+                  setIsProModalOpen(false);
+                  setProModalSource(null);
+                }}
                 className='rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100'
               >
                 Not Now
