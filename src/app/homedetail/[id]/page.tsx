@@ -8,6 +8,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type MouseEvent,
 } from 'react';
 import {
   flexRender,
@@ -23,8 +24,8 @@ import { onValue, ref, remove, set, update } from 'firebase/database';
 import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
-import { Vehicle, type Maintenance, type Part } from '../../../models/Vehicle';
-import { Calendar, Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Vehicle, type Maintenance, type Part, type Video } from '../../../models/Vehicle';
+import { Calendar, Check, Pencil, Plus, Trash2, X, Play } from 'lucide-react';
 
 interface PageProps {
   params: {
@@ -42,6 +43,11 @@ interface PartFormEntry {
   part: string;
   url: string;
   date: string;
+}
+
+interface VideoFormEntry {
+  name: string;
+  url: string;
 }
 
 interface GenerateDescriptionResponse {
@@ -143,14 +149,31 @@ export default function HomeDetailPage({ params }: PageProps) {
   const [notesError, setNotesError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [partFormState, setPartFormState] = useState<PartFormEntry[]>([]);
   const [editingPartRowId, setEditingPartRowId] = useState<number | null>(null);
   const [editingPartDraft, setEditingPartDraft] =
     useState<PartFormEntry | null>(null);
+
+  // Videos state
+  const [videoAddUrl, setVideoAddUrl] = useState('');
+  const [videoAddTitle, setVideoAddTitle] = useState('');
+  const [videoAddError, setVideoAddError] = useState<string | null>(null);
+  const [isAddingVideo, setIsAddingVideo] = useState(false);
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+  const [editingVideoRowId, setEditingVideoRowId] = useState<number | null>(
+    null
+  );
+  const [editingVideoDraft, setEditingVideoDraft] =
+    useState<VideoFormEntry | null>(null);
+  const [isUpdatingVideo, setIsUpdatingVideo] = useState(false);
+  const [updateVideoError, setUpdateVideoError] = useState<string | null>(null);
+  const [isPro, setIsPro] = useState(false);
   const [isUpdatingPart, setIsUpdatingPart] = useState(false);
   const [updatePartError, setUpdatePartError] = useState<string | null>(null);
   const [partSorting, setPartSorting] = useState<SortingState>([]);
   const [quickInfoSorting, setQuickInfoSorting] = useState<SortingState>([]);
+  const [videoSorting, setVideoSorting] = useState<SortingState>([]);
   const [aiDescription, setAiDescription] = useState<string | null>(null);
   const [isGeneratingAiDescription, setIsGeneratingAiDescription] =
     useState(false);
@@ -166,7 +189,7 @@ export default function HomeDetailPage({ params }: PageProps) {
   >(null);
   const [activeAiPartName, setActiveAiPartName] = useState<string | null>(null);
   const [deleteModalMode, setDeleteModalMode] = useState<
-    'asset' | 'part' | 'quickInfo' | null
+    'asset' | 'part' | 'quickInfo' | 'video' | null
   >(null);
   const [pendingPartDeleteIndex, setPendingPartDeleteIndex] = useState<
     number | null
@@ -176,6 +199,14 @@ export default function HomeDetailPage({ params }: PageProps) {
   >(null);
   const [pendingQuickInfoDeleteRow, setPendingQuickInfoDeleteRow] =
     useState<QuickInfoRow | null>(null);
+
+  const [pendingVideoDeleteIndex, setPendingVideoDeleteIndex] = useState<
+    number | null
+  >(null);
+  const [pendingVideoDeleteName, setPendingVideoDeleteName] = useState<
+    string | null
+  >(null);
+  const [pendingVideoDeleteKey, setPendingVideoDeleteKey] = useState<string | null>(null);
 
   const buildMaintenanceFormState = (
     targetAsset: Vehicle | null
@@ -274,6 +305,20 @@ export default function HomeDetailPage({ params }: PageProps) {
       setPendingPartDeleteIndex(null);
       setPendingPartDeleteName(null);
       setPendingQuickInfoDeleteRow(null);
+      // Reset videos state
+      setVideoAddUrl('');
+      setVideoAddTitle('');
+      setVideoAddError(null);
+      setIsAddingVideo(false);
+      setSelectedVideoId(null);
+      setEditingVideoRowId(null);
+      setEditingVideoDraft(null);
+      setIsUpdatingVideo(false);
+      setUpdateVideoError(null);
+      setVideoSorting([]);
+      setPendingVideoDeleteIndex(null);
+      setPendingVideoDeleteName(null);
+      setPendingVideoDeleteKey(null);
       return;
     }
 
@@ -343,6 +388,26 @@ export default function HomeDetailPage({ params }: PageProps) {
     setPendingPartDeleteIndex(null);
     setPendingPartDeleteName(null);
     setPendingQuickInfoDeleteRow(null);
+    // Initialize videos state
+    setVideoAddUrl('');
+    setVideoAddTitle('');
+    setVideoAddError(null);
+    setIsAddingVideo(false);
+    setEditingVideoRowId(null);
+    setEditingVideoDraft(null);
+    setIsUpdatingVideo(false);
+    setUpdateVideoError(null);
+    setVideoSorting([]);
+    setPendingVideoDeleteIndex(null);
+    setPendingVideoDeleteName(null);
+    setPendingVideoDeleteKey(null);
+    try {
+      const firstUrl = asset.videos?.find((v) => typeof v.url === 'string' && v.url.trim())?.url?.trim() || '';
+      const firstId = extractYouTubeId(firstUrl ?? '');
+      setSelectedVideoId(firstId);
+    } catch {
+      setSelectedVideoId(null);
+    }
   }, [asset]);
 
   // Scroll maintenance section into view when linked with ?edit=maintenance
@@ -354,6 +419,69 @@ export default function HomeDetailPage({ params }: PageProps) {
       }
     }
   }, [asset, searchParams]);
+
+  // Load Pro membership from localStorage (set by subscription flow)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = window.localStorage.getItem('assetmanagement-settings-preferences');
+      if (!saved) {
+        setIsPro(false);
+        return;
+      }
+      const parsed = JSON.parse(saved);
+      setIsPro(Boolean(parsed?.proPlanActive));
+    } catch {
+      setIsPro(false);
+    }
+  }, []);
+
+  const handleRecallClick = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!isPro) {
+        event.preventDefault();
+        router.push('/asset-manager-pro');
+      }
+    },
+    [isPro, router]
+  );
+
+  // Helpers: YouTube ID extractor
+  const extractYouTubeId = (input: string): string | null => {
+    const url = input?.trim();
+    if (!url) return null;
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      // youtu.be/<id>
+      if (host.includes('youtu.be')) {
+        const parts = u.pathname.split('/').filter(Boolean);
+        return parts[0] || null;
+      }
+      // youtube.com URLs
+      if (host.includes('youtube.com')) {
+        // /watch?v=<id>
+        if (u.pathname.startsWith('/watch')) {
+          const v = u.searchParams.get('v');
+          if (v) return v;
+        }
+        const parts = u.pathname.split('/').filter(Boolean);
+        // /embed/<id>
+        const embedIndex = parts.indexOf('embed');
+        if (embedIndex !== -1 && parts[embedIndex + 1]) {
+          return parts[embedIndex + 1];
+        }
+        // /shorts/<id>
+        const shortsIndex = parts.indexOf('shorts');
+        if (shortsIndex !== -1 && parts[shortsIndex + 1]) {
+          return parts[shortsIndex + 1];
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
 
   const handleFieldChange = (
     event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -523,11 +651,17 @@ export default function HomeDetailPage({ params }: PageProps) {
     if (deleteModalMode === 'quickInfo' && isDeletingQuickInfoRow) {
       return;
     }
+    if (deleteModalMode === 'video' && isUpdatingVideo) {
+      return;
+    }
     setIsDeleteModalOpen(false);
     setDeleteModalMode(null);
     setPendingPartDeleteIndex(null);
     setPendingPartDeleteName(null);
     setPendingQuickInfoDeleteRow(null);
+    setPendingVideoDeleteIndex(null);
+    setPendingVideoDeleteName(null);
+    setPendingVideoDeleteKey(null);
   };
 
   const handlePartFieldChange = (
@@ -597,6 +731,7 @@ export default function HomeDetailPage({ params }: PageProps) {
       const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
       await set(targetRef, sanitizedAsset);
       setIsEditingNotes(false);
+      setIsNotesModalOpen(false);
     } catch (error) {
       console.error('Failed to save notes', error);
       setNotesError('Unable to save notes. Please try again.');
@@ -1936,6 +2071,168 @@ export default function HomeDetailPage({ params }: PageProps) {
     pendingPartDeleteIndex,
   ]);
 
+  // Videos: edit/save/delete handlers
+  const startEditingVideo = useCallback((index: number, video: Video) => {
+    setEditingVideoRowId(index);
+    setEditingVideoDraft({ name: video.name ?? '', url: video.url ?? '' });
+    setUpdateVideoError(null);
+  }, []);
+
+  const cancelEditingVideo = useCallback(() => {
+    setEditingVideoRowId(null);
+    setEditingVideoDraft(null);
+    setUpdateVideoError(null);
+  }, []);
+
+  const saveEditingVideo = useCallback(
+    async (index: number) => {
+      if (
+        editingVideoRowId !== index ||
+        !editingVideoDraft ||
+        !asset ||
+        !currentUser
+      ) {
+        return;
+      }
+
+      const trimmedName = editingVideoDraft.name.trim();
+      const trimmedUrl = editingVideoDraft.url.trim();
+      const ytId = extractYouTubeId(trimmedUrl);
+      if (!ytId) {
+        setUpdateVideoError('Please provide a valid YouTube URL.');
+        return;
+      }
+
+      setIsUpdatingVideo(true);
+      setUpdateVideoError(null);
+
+      try {
+        const updatedVideos: Video[] = [...(asset.videos ?? [])];
+        if (!updatedVideos[index]) {
+          setUpdateVideoError(
+            'Unable to locate this video. Please refresh and try again.'
+          );
+          setIsUpdatingVideo(false);
+          return;
+        }
+
+        updatedVideos[index] = {
+          ...updatedVideos[index],
+          name: trimmedName || undefined,
+          url: trimmedUrl,
+        };
+
+        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+        const updatedAsset = { ...asset, videos: updatedVideos } as Vehicle &
+          Record<string, unknown>;
+        const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
+        await set(targetRef, sanitizedAsset);
+
+        setEditingVideoRowId(null);
+        setEditingVideoDraft(null);
+      } catch (error) {
+        console.error('Failed to update video', error);
+        setUpdateVideoError('Unable to save this video. Please try again.');
+      } finally {
+        setIsUpdatingVideo(false);
+      }
+    },
+    [asset, currentUser, editingVideoDraft, editingVideoRowId, id]
+  );
+
+  const openVideoDeleteModal = useCallback(
+    (index: number) => {
+      if (isUpdatingVideo) return;
+      setUpdateVideoError(null);
+
+      const target = asset?.videos?.[index] ?? null;
+      const titleLabel = target?.name?.trim() || null;
+
+      setPendingVideoDeleteIndex(index);
+      setPendingVideoDeleteName(titleLabel);
+      if (target) {
+        const key = `${(target.url ?? '').trim()}|${(target.name ?? '').trim()}`;
+        setPendingVideoDeleteKey(key);
+      } else {
+        setPendingVideoDeleteKey(null);
+      }
+      setDeleteModalMode('video');
+      setIsDeleteModalOpen(true);
+    },
+    [asset, isUpdatingVideo]
+  );
+
+  const handleDeleteVideo = useCallback(async () => {
+    if (
+      !asset ||
+      !currentUser ||
+      isUpdatingVideo ||
+      pendingVideoDeleteIndex === null
+    ) {
+      return;
+    }
+
+    const sourceVideos = asset.videos ?? [];
+    let deleteIndex = pendingVideoDeleteIndex;
+    if (
+      (deleteIndex === null || !sourceVideos[deleteIndex]) &&
+      pendingVideoDeleteKey
+    ) {
+      deleteIndex = sourceVideos.findIndex(
+        (v) => `${(v.url ?? '').trim()}|${(v.name ?? '').trim()}` === pendingVideoDeleteKey
+      );
+    }
+    if (deleteIndex === null || deleteIndex < 0 || !sourceVideos[deleteIndex]) {
+      setUpdateVideoError(
+        'Unable to locate this video. Please refresh and try again.'
+      );
+      setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
+      setPendingVideoDeleteIndex(null);
+      setPendingVideoDeleteName(null);
+      setPendingVideoDeleteKey(null);
+      return;
+    }
+
+    setIsUpdatingVideo(true);
+    setUpdateVideoError(null);
+
+    try {
+      const updatedVideos = sourceVideos.filter((_, vIndex) => vIndex !== deleteIndex);
+      const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+      const updatedAsset = {
+        ...asset,
+        videos: updatedVideos.length > 0 ? updatedVideos : undefined,
+      } as Vehicle & Record<string, unknown>;
+      const sanitized = JSON.parse(JSON.stringify(updatedAsset));
+      await set(targetRef, sanitized);
+
+      if (editingVideoRowId === deleteIndex) {
+        setEditingVideoRowId(null);
+        setEditingVideoDraft(null);
+      }
+
+      setIsDeleteModalOpen(false);
+      setDeleteModalMode(null);
+      setPendingVideoDeleteIndex(null);
+      setPendingVideoDeleteName(null);
+      setPendingVideoDeleteKey(null);
+    } catch (error) {
+      console.error('Failed to delete video', error);
+      setUpdateVideoError('Unable to delete this video. Please try again.');
+    } finally {
+      setIsUpdatingVideo(false);
+    }
+  }, [
+    asset,
+    currentUser,
+    editingVideoRowId,
+    id,
+    isUpdatingVideo,
+    pendingVideoDeleteIndex,
+    pendingVideoDeleteKey,
+  ]);
+
   const handleResetDescriptionOverride = useCallback(() => {
     setDescriptionSourceOverride(null);
     setActiveAiPartName(null);
@@ -2213,8 +2510,216 @@ export default function HomeDetailPage({ params }: PageProps) {
     onSortingChange: setPartSorting,
   });
 
+  // Videos table
+  const videoColumns = useMemo<ColumnDef<Video>[]>(() => {
+    const sortingIndicator = (direction: 'asc' | 'desc' | false) => {
+      if (direction === 'asc') return '^';
+      if (direction === 'desc') return 'v';
+      return '';
+    };
+
+    return [
+      {
+        accessorKey: 'name',
+        header: ({ column }) => (
+          <button
+            type='button'
+            onClick={column.getToggleSortingHandler()}
+            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+          >
+            Title
+            <span className='text-gray-400'>
+              {sortingIndicator(column.getIsSorted())}
+            </span>
+          </button>
+        ),
+        cell: ({ row }) => {
+          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          if (isEditing) {
+            return (
+              <input
+                value={editingVideoDraft.name}
+                onChange={(event) =>
+                  setEditingVideoDraft((prev) =>
+                    prev ? { ...prev, name: event.target.value } : prev
+                  )
+                }
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
+                placeholder='Video title (optional)'
+              />
+            );
+          }
+          const name = row.original.name?.trim() || 'Untitled';
+          const url = row.original.url?.trim();
+          if (url) {
+            return (
+              <a
+                href={url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-sm font-medium text-blue-600 hover:text-blue-700'
+              >
+                {name}
+              </a>
+            );
+          }
+          return <span className='text-sm text-gray-900'>{name}</span>;
+        },
+      },
+      {
+        accessorKey: 'url',
+        header: ({ column }) => (
+          <button
+            type='button'
+            onClick={column.getToggleSortingHandler()}
+            className='flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-gray-600'
+          >
+            URL
+            <span className='text-gray-400'>
+              {sortingIndicator(column.getIsSorted())}
+            </span>
+          </button>
+        ),
+        cell: ({ row }) => {
+          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          if (isEditing) {
+            return (
+              <input
+                value={editingVideoDraft.url}
+                onChange={(event) =>
+                  setEditingVideoDraft((prev) =>
+                    prev ? { ...prev, url: event.target.value } : prev
+                  )
+                }
+                className='w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900'
+                placeholder='https://www.youtube.com/watch?v=...'
+              />
+            );
+          }
+          const href = row.original.url?.trim();
+          if (!href) return <span className='text-gray-400'>-</span>;
+          return (
+            <a
+              href={href}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-sm text-blue-600 hover:text-blue-700'
+            >
+              {href}
+            </a>
+          );
+        },
+      },
+      {
+        id: 'play',
+        enableSorting: false,
+        header: () => (
+          <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Play
+          </div>
+        ),
+        cell: ({ row }) => {
+          const ytId = extractYouTubeId(row.original.url ?? '');
+          return (
+            <div className='flex items-center justify-center'>
+              <button
+                type='button'
+                onClick={() => setSelectedVideoId(ytId)}
+                disabled={!ytId}
+                className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                aria-label='Play video'
+                title={ytId ? 'Play' : 'Invalid URL'}
+              >
+                <Play className='h-4 w-4' />
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'actions',
+        header: () => (
+          <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Action
+          </div>
+        ),
+        cell: ({ row }) => {
+          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          return (
+            <div className='flex items-center justify-center gap-2'>
+              {!isEditing && (
+                <button
+                  type='button'
+                  onClick={() => startEditingVideo(row.index, row.original)}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100'
+                  aria-label='Edit video'
+                  disabled={isUpdatingVideo}
+                >
+                  <Pencil className='h-4 w-4' />
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  type='button'
+                  onClick={cancelEditingVideo}
+                  className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Cancel edit'
+                  disabled={isUpdatingVideo}
+                >
+                  <X className='h-4 w-4' />
+                </button>
+              )}
+              {isEditing && (
+                <button
+                  type='button'
+                  onClick={() => saveEditingVideo(row.index)}
+                  className='rounded-full border border-green-400 bg-green-50 p-1 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Save video'
+                  disabled={isUpdatingVideo}
+                >
+                  <Check className='h-4 w-4' />
+                </button>
+              )}
+              <button
+                type='button'
+                onClick={() => openVideoDeleteModal(row.index)}
+                className='rounded-full border border-red-400 bg-red-50 p-1 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50'
+                aria-label='Delete video'
+                disabled={isUpdatingVideo}
+              >
+                <Trash2 className='h-4 w-4' />
+              </button>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [
+    editingVideoDraft,
+    editingVideoRowId,
+    isUpdatingVideo,
+    startEditingVideo,
+    cancelEditingVideo,
+    saveEditingVideo,
+    openVideoDeleteModal,
+  ]);
+
+  const videoData = useMemo<Video[]>(() => asset?.videos ?? [], [asset]);
+
+  const videoTable = useReactTable<Video>({
+    data: videoData,
+    columns: videoColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+      sorting: videoSorting,
+    },
+    onSortingChange: setVideoSorting,
+  });
+
   const isDeleteModalPart = deleteModalMode === 'part';
   const isDeleteModalQuickInfo = deleteModalMode === 'quickInfo';
+  const isDeleteModalVideo = deleteModalMode === 'video';
   const quickInfoEntryLabel = pendingQuickInfoDeleteRow
     ? `${pendingQuickInfoDeleteRow.event}${
         pendingQuickInfoDeleteRow.date &&
@@ -2227,6 +2732,8 @@ export default function HomeDetailPage({ params }: PageProps) {
     ? 'Delete part?'
     : isDeleteModalQuickInfo
     ? 'Delete entry?'
+    : isDeleteModalVideo
+    ? 'Delete video?'
     : 'Delete asset?';
   const deleteModalMessage = isDeleteModalPart
     ? `Are you sure you want to delete ${
@@ -2236,11 +2743,19 @@ export default function HomeDetailPage({ params }: PageProps) {
       }? This action cannot be undone.`
     : isDeleteModalQuickInfo
     ? `Are you sure you want to delete ${quickInfoEntryLabel}? This action cannot be undone.`
+    : isDeleteModalVideo
+    ? `Are you sure you want to delete ${
+        pendingVideoDeleteName
+          ? `"${pendingVideoDeleteName}"`
+          : 'this video'
+      }? This action cannot be undone.`
     : 'Are you sure you want to delete this asset? This action cannot be undone.';
   const deleteModalInFlight = isDeleteModalPart
     ? isUpdatingPart
     : isDeleteModalQuickInfo
     ? isDeletingQuickInfoRow
+    : isDeleteModalVideo
+    ? isUpdatingVideo
     : isDeleting;
   const deleteModalConfirmLabel = isDeleteModalPart
     ? isUpdatingPart
@@ -2250,6 +2765,10 @@ export default function HomeDetailPage({ params }: PageProps) {
     ? isDeletingQuickInfoRow
       ? 'Deleting...'
       : 'Delete Entry'
+    : isDeleteModalVideo
+    ? isUpdatingVideo
+      ? 'Deleting...'
+      : 'Delete Video'
     : isDeleting
     ? 'Deleting...'
     : 'Delete Asset';
@@ -2262,6 +2781,10 @@ export default function HomeDetailPage({ params }: PageProps) {
       if (pendingQuickInfoDeleteRow) {
         void handleDeleteQuickInfoRow(pendingQuickInfoDeleteRow);
       }
+      return;
+    }
+    if (isDeleteModalVideo) {
+      void handleDeleteVideo();
       return;
     }
     void handleDeleteAsset();
@@ -2340,7 +2863,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                     <h2 className='text-xl font-semibold text-gray-900'>
                       Overview
                     </h2>
-                    <div className='flex items-center gap-2'>
+                    <div className='flex flex-col items-end gap-2'>
                       {!isEditing && (
                         <button
                           type='button'
@@ -2350,6 +2873,31 @@ export default function HomeDetailPage({ params }: PageProps) {
                           Edit Asset
                         </button>
                       )}
+                      {asset?.vin && asset.vin.trim().length > 0 && (
+                        <a
+                          href={`https://www.nhtsa.gov/recalls?vymm=${encodeURIComponent(asset.vin.trim())}`}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          onClick={handleRecallClick}
+                          className='inline-flex items-center rounded-md border border-blue-400 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 transition hover:bg-blue-100'
+                        >
+                          <span>Check for recall</span>
+                          <span className='ml-2 inline-flex items-center rounded-full border border-yellow-300 bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-yellow-800'>
+                            Pro
+                          </span>
+                        </a>
+                      )}
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setNotesError(null);
+                          setNotesDraft(asset?.notes ?? '');
+                          setIsNotesModalOpen(true);
+                        }}
+                        className='inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-medium text-gray-700 transition hover:bg-gray-100'
+                      >
+                        Notes
+                      </button>
                     </div>
                   </div>
 
@@ -3221,6 +3769,178 @@ export default function HomeDetailPage({ params }: PageProps) {
                 </section>
 
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+                  <div className='flex items-center justify-between'>
+                    <h2 className='text-xl font-semibold text-gray-900'>
+                      Videos
+                    </h2>
+                  </div>
+                  <div className='mt-4'>
+                    {selectedVideoId ? (
+                      <div
+                        className='relative w-full overflow-hidden rounded-md border border-gray-200 bg-black'
+                        style={{ paddingTop: '56.25%' }}
+                      >
+                        <iframe
+                          className='absolute left-0 top-0 h-full w-full'
+                          src={`https://www.youtube.com/embed/${selectedVideoId}`}
+                          title='YouTube video player'
+                          allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+                          allowFullScreen
+                        />
+                      </div>
+                    ) : (
+                      <p className='text-sm text-gray-500'>
+                        Paste a YouTube URL and add it, or use the table
+                        below to select a video to play.
+                      </p>
+                    )}
+                  </div>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!asset || !currentUser) return;
+                      const trimmedUrl = videoAddUrl.trim();
+                      const ytId = extractYouTubeId(trimmedUrl);
+                      if (!trimmedUrl || !ytId) {
+                        setVideoAddError('Please enter a valid YouTube URL.');
+                        return;
+                      }
+                      setIsAddingVideo(true);
+                      setVideoAddError(null);
+                      try {
+                        const newEntry: Video = {
+                          name: videoAddTitle.trim() || undefined,
+                          url: trimmedUrl,
+                        };
+                        const nextVideos: Video[] = [
+                          ...(asset.videos ?? []),
+                          newEntry,
+                        ];
+                        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
+                        const updatedAsset = { ...asset, videos: nextVideos } as Vehicle &
+                          Record<string, unknown>;
+                        const sanitized = JSON.parse(JSON.stringify(updatedAsset));
+                        await set(targetRef, sanitized);
+                        setVideoAddUrl('');
+                        setVideoAddTitle('');
+                        setSelectedVideoId(ytId);
+                      } catch (error) {
+                        console.error('Failed to add video', error);
+                        setVideoAddError('Unable to add video. Please try again.');
+                      } finally {
+                        setIsAddingVideo(false);
+                      }
+                    }}
+                    className='mt-4 space-y-3'
+                  >
+                    {videoAddError && (
+                      <p className='text-sm text-red-600'>{videoAddError}</p>
+                    )}
+                    <div className='grid gap-3 sm:grid-cols-3'>
+                      <div className='sm:col-span-2'>
+                        <label
+                          htmlFor='video-url'
+                          className='block text-sm font-medium text-gray-700'
+                        >
+                          YouTube URL
+                        </label>
+                        <input
+                          id='video-url'
+                          value={videoAddUrl}
+                          onChange={(e) => setVideoAddUrl(e.target.value)}
+                          placeholder='https://www.youtube.com/watch?v=...'
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor='video-title'
+                          className='block text-sm font-medium text-gray-700'
+                        >
+                          Title (optional)
+                        </label>
+                        <input
+                          id='video-title'
+                          value={videoAddTitle}
+                          onChange={(e) => setVideoAddTitle(e.target.value)}
+                          className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                        />
+                      </div>
+                    </div>
+                    <div className='flex items-center gap-3'>
+                      <button
+                        type='submit'
+                        disabled={isAddingVideo}
+                        className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+                      >
+                        {isAddingVideo ? 'Adding...' : 'Add Video'}
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => {
+                          setVideoAddUrl('');
+                          setVideoAddTitle('');
+                          setVideoAddError(null);
+                        }}
+                        disabled={isAddingVideo}
+                        className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </form>
+                  <div className='mt-4'>
+                    {!editingVideoRowId && updateVideoError && (
+                      <p className='mb-2 text-sm text-red-600'>{updateVideoError}</p>
+                    )}
+                    {videoData.length > 0 ? (
+                      <div className='overflow-x-auto rounded-lg border border-gray-200'>
+                        <table className='min-w-full divide-y divide-gray-200 text-left'>
+                          <thead className='bg-gray-50'>
+                            {videoTable.getHeaderGroups().map((headerGroup) => (
+                              <tr key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                  <th
+                                    key={header.id}
+                                    scope='col'
+                                    className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-500'
+                                  >
+                                    {header.isPlaceholder
+                                      ? null
+                                      : flexRender(
+                                          header.column.columnDef.header,
+                                          header.getContext()
+                                        )}
+                                  </th>
+                                ))}
+                              </tr>
+                            ))}
+                          </thead>
+                          <tbody className='divide-y divide-gray-200 bg-white'>
+                            {videoTable.getRowModel().rows.map((row) => (
+                              <tr key={row.id} className='hover:bg-gray-50'>
+                                {row.getVisibleCells().map((cell) => (
+                                  <td key={cell.id} className='px-4 py-2 text-gray-700'>
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className='text-sm text-gray-500'>
+                        No videos added yet.
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
                   <div className='flex flex-wrap items-center justify-between gap-3'>
                     <h2 className='text-xl font-semibold text-gray-900'>
                       AI Description
@@ -3623,6 +4343,63 @@ export default function HomeDetailPage({ params }: PageProps) {
           </div>
         </div>
       </Layout>
+      {isNotesModalOpen && (
+        <div
+          className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 px-4'
+          role='dialog'
+          aria-modal='true'
+          aria-labelledby='notes-modal-title'
+        >
+          <div className='w-full max-w-3xl rounded-lg bg-white p-8 shadow-xl md:max-h-[85vh] overflow-auto'>
+            <div className='mb-4'>
+              <h2 id='notes-modal-title' className='text-lg font-semibold text-gray-900'>
+                Asset Notes
+              </h2>
+              <p className='mt-1 text-sm text-gray-600'>
+                View and edit notes linked to this asset.
+              </p>
+            </div>
+            <form onSubmit={handleNotesSave} className='space-y-3'>
+              {notesError && (
+                <p className='text-sm text-red-600'>{notesError}</p>
+              )}
+              <div>
+                <label htmlFor='notes-modal-textarea' className='block text-sm font-medium text-gray-700'>
+                  Notes
+                </label>
+                <textarea
+                  id='notes-modal-textarea'
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  rows={12}
+                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 min-h-[300px]'
+                />
+              </div>
+              <div className='mt-2 flex justify-end gap-3'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setIsNotesModalOpen(false);
+                    setNotesError(null);
+                    setNotesDraft(asset?.notes ?? '');
+                  }}
+                  disabled={isSavingNotes}
+                  className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  disabled={isSavingNotes}
+                  className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {isSavingNotes ? 'Saving...' : 'Save Notes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {isDeleteModalOpen && (
         <div
           className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 px-4'
