@@ -185,7 +185,7 @@ export default function LandingPage() {
             <p className='text-gray-600 mb-4'>Perfect for personal use.</p>
             <p className='text-2xl font-bold mb-4 text-black'>$0/month</p>
             <ul className='text-gray-600 mb-4 space-y-2'>
-              <li>Up to 30 assets</li>
+              <li>Up to 20 assets</li>
               <li>Basic tracking & forms</li>
               <li>Photo uploads</li>
             </ul>
@@ -197,14 +197,12 @@ export default function LandingPage() {
             </Link>
           </div>
           <div className='bg-white p-6 rounded-lg shadow-md'>
-            <h3 className='text-xl font-semibold mb-2 text-black'>Pro Tier</h3>
-            <p className='text-gray-600 mb-4'>
-              Ideal for businesses and power users.
-            </p>
-            <p className='text-2xl font-bold mb-4 text-black'>$1.99/month</p>
+            <h3 className='text-xl font-semibold mb-2 text-black'>Go Pro: Unlock Unlimited Power</h3>
+    
+            <p className='text-2xl font-bold mb-4 text-black'>$2.99/month</p>
             <ul className='text-gray-600 mb-4 space-y-2'>
               <li>Unlimited assets</li>
-              <li>AI-powered insights</li>
+              <li>AI insights</li>
               <li>Advanced reports & exports</li>
               <li>Priority support</li>
             </ul>

@@ -208,6 +208,13 @@ export default function HomeDetailPage({ params }: PageProps) {
   >(null);
   const [pendingVideoDeleteKey, setPendingVideoDeleteKey] = useState<string | null>(null);
 
+  // Part notes modal state
+  const [isPartNoteModalOpen, setIsPartNoteModalOpen] = useState(false);
+  const [activePartNoteIndex, setActivePartNoteIndex] = useState<number | null>(null);
+  const [partNoteDraft, setPartNoteDraft] = useState('');
+  const [partNoteError, setPartNoteError] = useState<string | null>(null);
+  const [isSavingPartNote, setIsSavingPartNote] = useState(false);
+
   const buildMaintenanceFormState = (
     targetAsset: Vehicle | null
   ): MaintenanceFormEntry[] => {
@@ -401,14 +408,46 @@ export default function HomeDetailPage({ params }: PageProps) {
     setPendingVideoDeleteIndex(null);
     setPendingVideoDeleteName(null);
     setPendingVideoDeleteKey(null);
-    try {
-      const firstUrl = asset.videos?.find((v) => typeof v.url === 'string' && v.url.trim())?.url?.trim() || '';
-      const firstId = extractYouTubeId(firstUrl ?? '');
-      setSelectedVideoId(firstId);
-    } catch {
-      setSelectedVideoId(null);
-    }
+    // Do not auto-select a YouTube video by default.
+    setSelectedVideoId(null);
   }, [asset]);
+
+  // Open the Part Note modal for a specific row
+  const openPartNoteModal = useCallback((index: number) => {
+    setPartNoteError(null);
+    setActivePartNoteIndex(index);
+    const existing = asset?.partNumber?.[index]?.note ?? '';
+    setPartNoteDraft(typeof existing === 'string' ? existing : '');
+    setIsPartNoteModalOpen(true);
+  }, [asset]);
+
+  // Save the Part Note for the active row
+  const handleSavePartNote = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!asset || !currentUser || activePartNoteIndex === null) return;
+      if (isSavingPartNote) return;
+
+      setIsSavingPartNote(true);
+      setPartNoteError(null);
+      try {
+        const trimmed = partNoteDraft.trim();
+        const noteRef = ref(
+          db,
+          `assets/${currentUser.UserId}/${id}/partNumber/${activePartNoteIndex}`
+        );
+        await update(noteRef, { note: trimmed ? trimmed : null });
+        setIsPartNoteModalOpen(false);
+        setActivePartNoteIndex(null);
+      } catch (error) {
+        console.error('Failed to save part note', error);
+        setPartNoteError('Unable to save note. Please try again.');
+      } finally {
+        setIsSavingPartNote(false);
+      }
+    },
+    [asset, currentUser, id, activePartNoteIndex, isSavingPartNote, partNoteDraft]
+  );
 
   // Scroll maintenance section into view when linked with ?edit=maintenance
   useEffect(() => {
@@ -1615,6 +1654,31 @@ export default function HomeDetailPage({ params }: PageProps) {
         },
       },
       {
+        id: 'note',
+        enableSorting: false,
+        header: () => (
+          <span className='text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Note
+          </span>
+        ),
+        cell: () => (
+          <div className='flex justify-center'>
+            <button
+              type='button'
+              onClick={() => {
+                setNotesError(null);
+                setNotesDraft(asset?.notes ?? '');
+                setIsNotesModalOpen(true);
+              }}
+              className='inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700'
+              aria-label='Open notes'
+            >
+              Note
+            </button>
+          </div>
+        ),
+      },
+      {
         id: 'actions',
         header: () => (
           <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
@@ -2417,6 +2481,34 @@ export default function HomeDetailPage({ params }: PageProps) {
         },
       },
       {
+        id: 'note',
+        enableSorting: false,
+        header: () => (
+          <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
+            Note
+          </div>
+        ),
+        cell: ({ row }) => {
+          const p = row.original as Part;
+          const hasNote = typeof p.note === 'string' && p.note.trim().length > 0;
+          const badgeClass = hasNote
+            ? 'inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700'
+            : 'inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700';
+          return (
+            <div className='flex justify-center'>
+              <button
+                type='button'
+                onClick={() => openPartNoteModal(row.index)}
+                className={badgeClass}
+                aria-label='Add or edit note'
+              >
+                Note
+              </button>
+            </div>
+          );
+        },
+      },
+      {
         id: 'actions',
         header: () => (
           <div className='text-center text-xs font-semibold uppercase tracking-wide text-gray-600'>
@@ -2484,6 +2576,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     saveEditingPart,
     handleAskAiAboutPart,
     openPartDeleteModal,
+    openPartNoteModal,
   ]);
 
   const partData = useMemo<Part[]>(() => asset?.partNumber ?? [], [asset]);
@@ -3823,7 +3916,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                         await set(targetRef, sanitized);
                         setVideoAddUrl('');
                         setVideoAddTitle('');
-                        setSelectedVideoId(ytId);
+                        // Do not auto-play newly added video; wait for user click.
                       } catch (error) {
                         console.error('Failed to add video', error);
                         setVideoAddError('Unable to add video. Please try again.');
@@ -4394,6 +4487,68 @@ export default function HomeDetailPage({ params }: PageProps) {
                   className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   {isSavingNotes ? 'Saving...' : 'Save Notes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {isPartNoteModalOpen && (
+        <div
+          className='fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 px-4'
+          role='dialog'
+          aria-modal='true'
+          aria-labelledby='part-note-modal-title'
+        >
+          <div className='w-full max-w-xl rounded-lg bg-white p-6 shadow-xl'>
+            <h2 id='part-note-modal-title' className='text-lg font-semibold text-gray-900'>
+              Part Note
+            </h2>
+            <p className='mt-1 text-sm text-gray-600'>
+              {(() => {
+                try {
+                  const p = asset?.partNumber?.[activePartNoteIndex ?? -1];
+                  const label = (p?.part || p?.type || '').toString().trim();
+                  return label ? `For: ${label}` : '';
+                } catch { return ''; }
+              })()}
+            </p>
+            <form onSubmit={handleSavePartNote} className='mt-4 space-y-3'>
+              {partNoteError && (
+                <p className='text-sm text-red-600'>{partNoteError}</p>
+              )}
+              <div>
+                <label htmlFor='part-note-textarea' className='block text-sm font-medium text-gray-700'>
+                  Note
+                </label>
+                <textarea
+                  id='part-note-textarea'
+                  value={partNoteDraft}
+                  onChange={(e) => setPartNoteDraft(e.target.value)}
+                  rows={8}
+                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                  placeholder='Add a note about this part'
+                />
+              </div>
+              <div className='mt-2 flex justify-end gap-3'>
+                <button
+                  type='button'
+                  onClick={() => {
+                    setIsPartNoteModalOpen(false);
+                    setPartNoteError(null);
+                    setPartNoteDraft(asset?.partNumber?.[activePartNoteIndex ?? -1]?.note ?? '');
+                  }}
+                  disabled={isSavingPartNote}
+                  className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  disabled={isSavingPartNote}
+                  className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  {isSavingPartNote ? 'Saving...' : 'Save Note'}
                 </button>
               </div>
             </form>

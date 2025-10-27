@@ -57,6 +57,7 @@ export interface Part {
   url?: string
   date?: Date | string
   description?: string
+  note?: string
 }
 
 export interface Tool {
