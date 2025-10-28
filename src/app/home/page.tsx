@@ -9,7 +9,6 @@ import { Vehicle } from '../../models/Vehicle';
 import { ref, onValue, push, set, update } from 'firebase/database';
 import { db } from '../../lib/firebase';
 import Layout from '../../components/layout/Layout';
-import { Pencil } from 'lucide-react';
 
 export default function HomePage() {
   const { currentUser, loading } = useAuth();
@@ -632,11 +631,11 @@ export default function HomePage() {
                               e.stopPropagation();
                               openOdometerEditor(asset);
                             }}
-                            className='rounded-full border border-gray-300 p-1 text-gray-600 transition hover:bg-gray-100'
-                            aria-label='Edit current odometer'
-                            title='Edit current odometer'
+                            className='inline-flex items-center rounded-md border border-blue-400 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50'
+                            aria-label='Add odometer reading'
+                            title='Add Odometer'
                           >
-                            <Pencil className='w-4 h-4' />
+                            Add Odometer
                           </button>
                         )}
                       </div>

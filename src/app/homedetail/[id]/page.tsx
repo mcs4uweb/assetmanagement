@@ -3418,6 +3418,38 @@ export default function HomeDetailPage({ params }: PageProps) {
                           This asset doesn&apos;t have additional details yet.
                         </p>
                       )}
+                      {asset?.warranty ? (
+                        <div className='rounded-md border border-blue-200 bg-blue-50/60 p-4 text-sm text-gray-700'>
+                          <div className='flex items-center justify-between'>
+                            <h3 className='text-sm font-semibold text-blue-800'>Warranty</h3>
+                            <span className='text-xs font-medium text-blue-800'>
+                              {asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
+                                ? `Expires ${new Date(asset.warrantyExpiry as any).toLocaleDateString()}`
+                                : 'Active'}
+                            </span>
+                          </div>
+                          <dl className='mt-2 space-y-1'>
+                            {asset.warrantyNumber ? (
+                              <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
+                                <dt className='text-xs font-medium text-gray-500'>Number</dt>
+                                <dd className='text-sm text-gray-900'>{String(asset.warrantyNumber).trim()}</dd>
+                              </div>
+                            ) : null}
+                            {asset.warrantyPhone ? (
+                              <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
+                                <dt className='text-xs font-medium text-gray-500'>Phone</dt>
+                                <dd className='text-sm text-gray-900'>{String(asset.warrantyPhone).trim()}</dd>
+                              </div>
+                            ) : null}
+                            {asset.warrantyNotes ? (
+                              <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
+                                <dt className='text-xs font-medium text-gray-500'>Notes</dt>
+                                <dd className='text-sm text-gray-900'>{String(asset.warrantyNotes).trim()}</dd>
+                              </div>
+                            ) : null}
+                          </dl>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                 </section>

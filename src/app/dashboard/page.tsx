@@ -18,7 +18,7 @@ import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { db } from '../../lib/firebase';
 import { type Vehicle, type Maintenance } from '../../models/Vehicle';
-import { Bell, Trash2 } from 'lucide-react';
+import { Bell, Trash2, HelpCircle } from 'lucide-react';
 
 interface DashboardItem {
   assetKey: string;
@@ -696,8 +696,26 @@ export default function DashboardPage() {
           </section>
           <section className='w-full md:w-full rounded-lg bg-white p-3 md:p-4 shadow-sm'>
             <div className='mb-2 flex items-center justify-between'>
-              <h2 className='text-lg font-semibold text-gray-900'>
+              <h2 className='text-lg font-semibold text-gray-900 flex items-center gap-2'>
                 Vehicles Missing or Stale Odometer Reading
+                <span
+                  className='relative inline-flex group'
+                  tabIndex={0}
+                  aria-describedby='odo-tooltip'
+                >
+                  <HelpCircle
+                    className='h-5 w-5 text-gray-400 cursor-help group-hover:text-gray-500 group-focus:text-gray-500'
+                    aria-hidden='true'
+                  />
+                  <span
+                    id='odo-tooltip'
+                    role='tooltip'
+                    className='pointer-events-none absolute left-6 top-1/2 -translate-y-1/2 z-10 w-72 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100'
+                  >
+                    By entering your odometer on frequent basis we can determine different maintenance intervals
+                    <span className='absolute left-0 top-1/2 -translate-y-1/2 -ml-1.5 h-3 w-3 rotate-45 bg-gray-900'></span>
+                  </span>
+                </span>
               </h2>
               <div className='flex items-center gap-3'>
                 <span className='text-xs text-gray-500'>
