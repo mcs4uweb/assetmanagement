@@ -462,8 +462,8 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        <main className='mx-auto max-w-7xl px-3 py-4 flex flex-col gap-4 md:flex-row md:flex-wrap'>
-          <section className='w-full rounded-lg bg-white p-3 md:p-4 shadow-sm border border-solid border-green-300'>
+        <main className='mx-auto max-w-7xl px-3 py-4 grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch'>
+          <section className='w-full h-full flex flex-col rounded-lg bg-white p-3 md:p-4 shadow-sm border border-solid border-green-300'>
             <div className='mb-2 flex items-center justify-between'>
               <h2 className='text-lg font-semibold text-green-800'>
                 Reminders
@@ -506,7 +506,7 @@ export default function DashboardPage() {
               </ul>
             )}
           </section>
-          <section className='w-full md:w-1/2 rounded-lg bg-white p-3 md:p-4 shadow-sm'>
+          <section className='w-full h-full flex flex-col rounded-lg bg-white p-3 md:p-4 shadow-sm'>
             <div className='mb-2 flex items-center justify-between'>
               <h2 className='text-lg font-semibold text-gray-900'>
                 Warranties Expiring Soon
@@ -600,7 +600,7 @@ export default function DashboardPage() {
             )}
           </section>
 
-          <section className='w-full md:w-1/2 rounded-lg bg-white p-3 md:p-4 shadow-sm'>
+          <section className='w-full h-full flex flex-col rounded-lg bg-white p-3 md:p-4 shadow-sm'>
             <div className='mb-2 flex items-center justify-between'>
               <h2 className='text-lg font-semibold text-gray-900'>
                 Upcoming Maintenance
@@ -694,7 +694,7 @@ export default function DashboardPage() {
               </ul>
             )}
           </section>
-          <section className='w-full md:w-full rounded-lg bg-white p-3 md:p-4 shadow-sm'>
+          <section className='w-full h-full flex flex-col rounded-lg bg-white p-3 md:p-4 shadow-sm'>
             <div className='mb-2 flex items-center justify-between'>
               <h2 className='text-lg font-semibold text-gray-900 flex items-center gap-2'>
                 Vehicles Missing or Stale Odometer Reading
