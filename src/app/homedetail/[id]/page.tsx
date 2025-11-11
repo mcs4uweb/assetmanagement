@@ -24,7 +24,12 @@ import { onValue, ref, remove, set, update } from 'firebase/database';
 import Layout from '../../../components/layout/Layout';
 import { useAuth } from '../../../contexts/AuthContext';
 import { db } from '../../../lib/firebase';
-import { Vehicle, type Maintenance, type Part, type Video } from '../../../models/Vehicle';
+import {
+  Vehicle,
+  type Maintenance,
+  type Part,
+  type Video,
+} from '../../../models/Vehicle';
 import { Calendar, Check, Pencil, Plus, Trash2, X, Play } from 'lucide-react';
 
 interface PageProps {
@@ -206,11 +211,15 @@ export default function HomeDetailPage({ params }: PageProps) {
   const [pendingVideoDeleteName, setPendingVideoDeleteName] = useState<
     string | null
   >(null);
-  const [pendingVideoDeleteKey, setPendingVideoDeleteKey] = useState<string | null>(null);
+  const [pendingVideoDeleteKey, setPendingVideoDeleteKey] = useState<
+    string | null
+  >(null);
 
   // Part notes modal state
   const [isPartNoteModalOpen, setIsPartNoteModalOpen] = useState(false);
-  const [activePartNoteIndex, setActivePartNoteIndex] = useState<number | null>(null);
+  const [activePartNoteIndex, setActivePartNoteIndex] = useState<number | null>(
+    null
+  );
   const [partNoteDraft, setPartNoteDraft] = useState('');
   const [partNoteError, setPartNoteError] = useState<string | null>(null);
   const [isSavingPartNote, setIsSavingPartNote] = useState(false);
@@ -260,26 +269,26 @@ export default function HomeDetailPage({ params }: PageProps) {
 
   useEffect(() => {
     if (!asset) {
-    setFormState({
-      make: '',
-      model: '',
-      year: '',
-      vin: '',
-      plate: '',
-      tires: '',
-      tireSize: '',
-      tirePressure: '',
-      oilType: '',
-      category: searchParams.get('category') ?? '',
-      warranty: false,
-      warrantyNumber: '',
-      warrantyPhone: '',
-      warrantyNotes: '',
-      warrantyExpiry: '',
-      insuranceCompany: '',
-      insurancePolicyNumber: '',
-      insuranceExpirationDate: '',
-    });
+      setFormState({
+        make: '',
+        model: '',
+        year: '',
+        vin: '',
+        plate: '',
+        tires: '',
+        tireSize: '',
+        tirePressure: '',
+        oilType: '',
+        category: searchParams.get('category') ?? '',
+        warranty: false,
+        warrantyNumber: '',
+        warrantyPhone: '',
+        warrantyNotes: '',
+        warrantyExpiry: '',
+        insuranceCompany: '',
+        insurancePolicyNumber: '',
+        insuranceExpirationDate: '',
+      });
       setMaintenanceFormState([]);
       setEditingQuickInfoRowId(null);
       setQuickInfoRowDraft({ reading: '', date: '' });
@@ -345,14 +354,18 @@ export default function HomeDetailPage({ params }: PageProps) {
       warrantyPhone: asset.warrantyPhone ?? '',
       warrantyNotes: asset.warrantyNotes ?? '',
       warrantyExpiry:
-        asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
+        asset.warrantyExpiry &&
+        !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
           ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
           : '',
       insuranceCompany: asset.insuranceCompany ?? '',
       insurancePolicyNumber: asset.insurancePolicyNumber ?? '',
       insuranceExpirationDate:
-        asset.insuranceExpirationDate && !Number.isNaN(new Date(asset.insuranceExpirationDate as any).getTime())
-          ? new Date(asset.insuranceExpirationDate as any).toISOString().split('T')[0]
+        asset.insuranceExpirationDate &&
+        !Number.isNaN(new Date(asset.insuranceExpirationDate as any).getTime())
+          ? new Date(asset.insuranceExpirationDate as any)
+              .toISOString()
+              .split('T')[0]
           : '',
     });
     const nextMaintenanceState = buildMaintenanceFormState(asset);
@@ -413,13 +426,16 @@ export default function HomeDetailPage({ params }: PageProps) {
   }, [asset]);
 
   // Open the Part Note modal for a specific row
-  const openPartNoteModal = useCallback((index: number) => {
-    setPartNoteError(null);
-    setActivePartNoteIndex(index);
-    const existing = asset?.partNumber?.[index]?.note ?? '';
-    setPartNoteDraft(typeof existing === 'string' ? existing : '');
-    setIsPartNoteModalOpen(true);
-  }, [asset]);
+  const openPartNoteModal = useCallback(
+    (index: number) => {
+      setPartNoteError(null);
+      setActivePartNoteIndex(index);
+      const existing = asset?.partNumber?.[index]?.note ?? '';
+      setPartNoteDraft(typeof existing === 'string' ? existing : '');
+      setIsPartNoteModalOpen(true);
+    },
+    [asset]
+  );
 
   // Save the Part Note for the active row
   const handleSavePartNote = useCallback(
@@ -446,7 +462,14 @@ export default function HomeDetailPage({ params }: PageProps) {
         setIsSavingPartNote(false);
       }
     },
-    [asset, currentUser, id, activePartNoteIndex, isSavingPartNote, partNoteDraft]
+    [
+      asset,
+      currentUser,
+      id,
+      activePartNoteIndex,
+      isSavingPartNote,
+      partNoteDraft,
+    ]
   );
 
   // Scroll maintenance section into view when linked with ?edit=maintenance
@@ -463,7 +486,9 @@ export default function HomeDetailPage({ params }: PageProps) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const saved = window.localStorage.getItem('assetmanagement-settings-preferences');
+      const saved = window.localStorage.getItem(
+        'assetmanagement-settings-preferences'
+      );
       if (!saved) {
         setIsPro(false);
         return;
@@ -559,10 +584,18 @@ export default function HomeDetailPage({ params }: PageProps) {
         oilType: formState.oilType.trim(),
         category: formState.category.trim(),
         warranty: warrantyOn,
-        warrantyNumber: warrantyOn ? (formState.warrantyNumber.trim() || null) : null,
-        warrantyPhone: warrantyOn ? (formState.warrantyPhone.trim() || null) : null,
-        warrantyNotes: warrantyOn ? (formState.warrantyNotes.trim() || null) : null,
-        warrantyExpiry: warrantyOn ? toIsoOrNull(formState.warrantyExpiry) : null,
+        warrantyNumber: warrantyOn
+          ? formState.warrantyNumber.trim() || null
+          : null,
+        warrantyPhone: warrantyOn
+          ? formState.warrantyPhone.trim() || null
+          : null,
+        warrantyNotes: warrantyOn
+          ? formState.warrantyNotes.trim() || null
+          : null,
+        warrantyExpiry: warrantyOn
+          ? toIsoOrNull(formState.warrantyExpiry)
+          : null,
         insuranceCompany: formState.insuranceCompany.trim(),
         insurancePolicyNumber: formState.insurancePolicyNumber.trim(),
         insuranceExpirationDate: toIsoOrNull(formState.insuranceExpirationDate),
@@ -921,7 +954,8 @@ export default function HomeDetailPage({ params }: PageProps) {
         };
 
         const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
-        const updatedAsset = { ...asset, partNumber: updatedParts } as Vehicle & Record<string, unknown>;
+        const updatedAsset = { ...asset, partNumber: updatedParts } as Vehicle &
+          Record<string, unknown>;
         const sanitizedAsset = JSON.parse(JSON.stringify(updatedAsset));
         await set(targetRef, sanitizedAsset);
 
@@ -1010,17 +1044,14 @@ export default function HomeDetailPage({ params }: PageProps) {
     ]
   );
 
-  const openQuickInfoAddForm = useCallback(
-    (type: 'odometer' | 'oilChange') => {
-      setQuickInfoError(null);
-      setQuickInfoAddForm({ reading: '', date: '' });
-      setQuickInfoAddType(type);
-      setIsQuickInfoAddMenuOpen(false);
-      setEditingQuickInfoRowId(null);
-      setQuickInfoRowDraft({ reading: '', date: '' });
-    },
-    []
-  );
+  const openQuickInfoAddForm = useCallback((type: 'odometer' | 'oilChange') => {
+    setQuickInfoError(null);
+    setQuickInfoAddForm({ reading: '', date: '' });
+    setQuickInfoAddType(type);
+    setIsQuickInfoAddMenuOpen(false);
+    setEditingQuickInfoRowId(null);
+    setQuickInfoRowDraft({ reading: '', date: '' });
+  }, []);
 
   const openQuickInfoDeleteModal = useCallback(
     (row: QuickInfoRow) => {
@@ -1029,10 +1060,10 @@ export default function HomeDetailPage({ params }: PageProps) {
       setQuickInfoAddType(null);
       setQuickInfoAddForm({ reading: '', date: '' });
       setIsQuickInfoAddMenuOpen(false);
-       if (editingQuickInfoRowId === row.id) {
-         setEditingQuickInfoRowId(null);
-         setQuickInfoRowDraft({ reading: '', date: '' });
-       }
+      if (editingQuickInfoRowId === row.id) {
+        setEditingQuickInfoRowId(null);
+        setQuickInfoRowDraft({ reading: '', date: '' });
+      }
       setPendingQuickInfoDeleteRow(row);
       setDeleteModalMode('quickInfo');
       setIsDeleteModalOpen(true);
@@ -1303,7 +1334,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     const parts = [asset.year, asset.make, asset.model]
       .filter(
         (value) =>
-          value !== undefined && value !== null && String(value).trim().length > 0
+          value !== undefined &&
+          value !== null &&
+          String(value).trim().length > 0
       )
       .map((value) => String(value).trim());
 
@@ -1316,7 +1349,7 @@ export default function HomeDetailPage({ params }: PageProps) {
     }
 
     return asset.category?.trim() || 'Vehicle';
-}, [asset]);
+  }, [asset]);
 
   const headerModelYear = useMemo(() => {
     if (!asset) return '';
@@ -1324,7 +1357,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     const parts = [asset.model, asset.year]
       .filter(
         (value) =>
-          value !== undefined && value !== null && String(value).trim().length > 0
+          value !== undefined &&
+          value !== null &&
+          String(value).trim().length > 0
       )
       .map((value) => String(value).trim());
 
@@ -1363,9 +1398,7 @@ export default function HomeDetailPage({ params }: PageProps) {
       }
 
       const parsed =
-        input instanceof Date
-          ? input
-          : new Date(input as string | number);
+        input instanceof Date ? input : new Date(input as string | number);
 
       if (Number.isNaN(parsed.getTime())) {
         return '';
@@ -1388,11 +1421,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         return 'N/A';
       }
       const [year, month, day] = inputDate.split('-').map(Number);
-      if (
-        Number.isNaN(year) ||
-        Number.isNaN(month) ||
-        Number.isNaN(day)
-      ) {
+      if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
         return 'N/A';
       }
       return formatWithUtc(new Date(Date.UTC(year, month - 1, day)));
@@ -1464,11 +1493,7 @@ export default function HomeDetailPage({ params }: PageProps) {
       const y = Number(yStr);
       const m = Number(mStr);
       const d = Number(dStr);
-      if (
-        Number.isNaN(y) ||
-        Number.isNaN(m) ||
-        Number.isNaN(d)
-      ) {
+      if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) {
         return 'N/A';
       }
       const next = new Date(Date.UTC(y, m - 1 + 8, d));
@@ -1501,7 +1526,10 @@ export default function HomeDetailPage({ params }: PageProps) {
     };
 
     // Determine the latest raw date per source to avoid flagging older rows
-    const latestRawBySource: Record<'odometer' | 'oilChange', string | undefined> = {
+    const latestRawBySource: Record<
+      'odometer' | 'oilChange',
+      string | undefined
+    > = {
       odometer: undefined,
       oilChange: undefined,
     };
@@ -1566,7 +1594,9 @@ export default function HomeDetailPage({ params }: PageProps) {
             );
           }
           return (
-            <span className='text-sm text-gray-700'>{row.original.reading}</span>
+            <span className='text-sm text-gray-700'>
+              {row.original.reading}
+            </span>
           );
         },
       },
@@ -1641,7 +1671,8 @@ export default function HomeDetailPage({ params }: PageProps) {
             : row.original.rawDate;
           const display = formatNextActionDate(baseRaw);
           const overdue = isNextActionDateOverdue(baseRaw);
-          const isLatestForSource = !!baseRaw && baseRaw === latestRawBySource[row.original.source];
+          const isLatestForSource =
+            !!baseRaw && baseRaw === latestRawBySource[row.original.source];
           const shouldWarn = overdue && display !== 'N/A' && isLatestForSource;
           if (shouldWarn) {
             return (
@@ -1777,7 +1808,8 @@ export default function HomeDetailPage({ params }: PageProps) {
       return String(value).trim();
     };
 
-    const isHousehold = (asset.category ?? '').toString().toLowerCase().trim() === 'household';
+    const isHousehold =
+      (asset.category ?? '').toString().toLowerCase().trim() === 'household';
     const entries: OverviewDetailEntry[] = [];
 
     if (!isHousehold) {
@@ -1802,10 +1834,15 @@ export default function HomeDetailPage({ params }: PageProps) {
           column: 'primary',
           placeholder: 'Not set',
           alwaysShow: true,
-        },
+        }
       );
     } else {
-      const warrantyValue = typeof asset.warranty === 'boolean' ? (asset.warranty ? 'Yes' : 'No') : '';
+      const warrantyValue =
+        typeof asset.warranty === 'boolean'
+          ? asset.warranty
+            ? 'Yes'
+            : 'No'
+          : '';
       let warrantyExpiry = '';
       if (asset.warrantyExpiry) {
         const d = new Date(asset.warrantyExpiry as any);
@@ -1856,7 +1893,7 @@ export default function HomeDetailPage({ params }: PageProps) {
         label: 'Plate',
         value: normalizeValue(asset.plate),
         column: 'secondary',
-      },
+      }
     );
 
     const filtered = entries
@@ -1864,9 +1901,7 @@ export default function HomeDetailPage({ params }: PageProps) {
       .map<OverviewDetailEntry>((entry) => ({
         ...entry,
         displayValue:
-          entry.value.length > 0
-            ? entry.value
-            : entry.placeholder ?? 'Not set',
+          entry.value.length > 0 ? entry.value : entry.placeholder ?? 'Not set',
       }));
 
     return {
@@ -2215,7 +2250,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       setPendingVideoDeleteIndex(index);
       setPendingVideoDeleteName(titleLabel);
       if (target) {
-        const key = `${(target.url ?? '').trim()}|${(target.name ?? '').trim()}`;
+        const key = `${(target.url ?? '').trim()}|${(
+          target.name ?? ''
+        ).trim()}`;
         setPendingVideoDeleteKey(key);
       } else {
         setPendingVideoDeleteKey(null);
@@ -2243,7 +2280,9 @@ export default function HomeDetailPage({ params }: PageProps) {
       pendingVideoDeleteKey
     ) {
       deleteIndex = sourceVideos.findIndex(
-        (v) => `${(v.url ?? '').trim()}|${(v.name ?? '').trim()}` === pendingVideoDeleteKey
+        (v) =>
+          `${(v.url ?? '').trim()}|${(v.name ?? '').trim()}` ===
+          pendingVideoDeleteKey
       );
     }
     if (deleteIndex === null || deleteIndex < 0 || !sourceVideos[deleteIndex]) {
@@ -2262,7 +2301,9 @@ export default function HomeDetailPage({ params }: PageProps) {
     setUpdateVideoError(null);
 
     try {
-      const updatedVideos = sourceVideos.filter((_, vIndex) => vIndex !== deleteIndex);
+      const updatedVideos = sourceVideos.filter(
+        (_, vIndex) => vIndex !== deleteIndex
+      );
       const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
       const updatedAsset = {
         ...asset,
@@ -2490,7 +2531,8 @@ export default function HomeDetailPage({ params }: PageProps) {
         ),
         cell: ({ row }) => {
           const p = row.original as Part;
-          const hasNote = typeof p.note === 'string' && p.note.trim().length > 0;
+          const hasNote =
+            typeof p.note === 'string' && p.note.trim().length > 0;
           const badgeClass = hasNote
             ? 'inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700'
             : 'inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-[11px] font-semibold text-gray-700';
@@ -2627,7 +2669,8 @@ export default function HomeDetailPage({ params }: PageProps) {
           </button>
         ),
         cell: ({ row }) => {
-          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          const isEditing =
+            editingVideoRowId === row.index && editingVideoDraft;
           if (isEditing) {
             return (
               <input
@@ -2674,7 +2717,8 @@ export default function HomeDetailPage({ params }: PageProps) {
           </button>
         ),
         cell: ({ row }) => {
-          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          const isEditing =
+            editingVideoRowId === row.index && editingVideoDraft;
           if (isEditing) {
             return (
               <input
@@ -2737,7 +2781,8 @@ export default function HomeDetailPage({ params }: PageProps) {
           </div>
         ),
         cell: ({ row }) => {
-          const isEditing = editingVideoRowId === row.index && editingVideoDraft;
+          const isEditing =
+            editingVideoRowId === row.index && editingVideoDraft;
           return (
             <div className='flex items-center justify-center gap-2'>
               {!isEditing && (
@@ -2830,17 +2875,13 @@ export default function HomeDetailPage({ params }: PageProps) {
     : 'Delete asset?';
   const deleteModalMessage = isDeleteModalPart
     ? `Are you sure you want to delete ${
-        pendingPartDeleteName
-          ? `"${pendingPartDeleteName}"`
-          : 'this part'
+        pendingPartDeleteName ? `"${pendingPartDeleteName}"` : 'this part'
       }? This action cannot be undone.`
     : isDeleteModalQuickInfo
     ? `Are you sure you want to delete ${quickInfoEntryLabel}? This action cannot be undone.`
     : isDeleteModalVideo
     ? `Are you sure you want to delete ${
-        pendingVideoDeleteName
-          ? `"${pendingVideoDeleteName}"`
-          : 'this video'
+        pendingVideoDeleteName ? `"${pendingVideoDeleteName}"` : 'this video'
       }? This action cannot be undone.`
     : 'Are you sure you want to delete this asset? This action cannot be undone.';
   const deleteModalInFlight = isDeleteModalPart
@@ -2928,7 +2969,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                   {asset?.make || 'Asset Detail'}
                 </h1>
                 {headerModelYear && (
-                  <p className='mt-1 text-sm text-gray-600'>{headerModelYear}</p>
+                  <p className='mt-1 text-sm text-gray-600'>
+                    {headerModelYear}
+                  </p>
                 )}
               </div>
               <div className='flex items-center gap-3'>
@@ -2968,7 +3011,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                       )}
                       {asset?.vin && asset.vin.trim().length > 0 && (
                         <a
-                          href={`https://www.nhtsa.gov/recalls?vymm=${encodeURIComponent(asset.vin.trim())}`}
+                          href={`https://www.nhtsa.gov/recalls?vymm=${encodeURIComponent(
+                            asset.vin.trim()
+                          )}`}
                           target='_blank'
                           rel='noopener noreferrer'
                           onClick={handleRecallClick}
@@ -3079,10 +3124,14 @@ export default function HomeDetailPage({ params }: PageProps) {
                             className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                           />
                         </div>
-                        {formState.category.trim().toLowerCase() !== 'household' ? (
+                        {formState.category.trim().toLowerCase() !==
+                        'household' ? (
                           <>
                             <div>
-                              <label htmlFor='tireSize' className='block text-sm font-medium text-gray-700'>
+                              <label
+                                htmlFor='tireSize'
+                                className='block text-sm font-medium text-gray-700'
+                              >
                                 Tire Size
                               </label>
                               <input
@@ -3095,7 +3144,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                               />
                             </div>
                             <div>
-                              <label htmlFor='tirePressure' className='block text-sm font-medium text-gray-700'>
+                              <label
+                                htmlFor='tirePressure'
+                                className='block text-sm font-medium text-gray-700'
+                              >
                                 Tire Pressure
                               </label>
                               <input
@@ -3108,99 +3160,23 @@ export default function HomeDetailPage({ params }: PageProps) {
                               />
                             </div>
                             <div>
-                          <label htmlFor='oilType' className='block text-sm font-medium text-gray-700'>
-                            Oil Type
-                          </label>
-                          <input
-                            id='oilType'
-                            name='oilType'
-                            value={formState.oilType}
-                            onChange={handleFieldChange}
-                            className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                            placeholder='e.g. 5W-30 Synthetic'
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className='flex items-center gap-2'>
-                              <input
-                                id='warranty'
-                                name='warranty'
-                                type='checkbox'
-                                checked={formState.warranty}
-                                onChange={(e) => setFormState((prev) => ({ ...prev, warranty: e.target.checked }))}
-                                className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
-                              />
-                              <label htmlFor='warranty' className='text-sm font-medium text-gray-700'>
-                                Under Warranty
-                              </label>
-                            </div>
-                            {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyNumber' className='block text-sm font-medium text-gray-700'>
-                                Warranty Number
+                              <label
+                                htmlFor='oilType'
+                                className='block text-sm font-medium text-gray-700'
+                              >
+                                Oil Type
                               </label>
                               <input
-                                id='warrantyNumber'
-                                name='warrantyNumber'
-                                value={formState.warrantyNumber}
+                                id='oilType'
+                                name='oilType'
+                                value={formState.oilType}
                                 onChange={handleFieldChange}
                                 className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='e.g. ABC-1234567'
+                                placeholder='e.g. 5W-30 Synthetic'
                               />
                             </div>
-                            )}
-                            {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyPhone' className='block text-sm font-medium text-gray-700'>
-                                Warranty Phone
-                              </label>
-                              <input
-                                id='warrantyPhone'
-                                name='warrantyPhone'
-                                type='tel'
-                                value={formState.warrantyPhone}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='e.g. (800) 555-1234'
-                              />
-                            </div>
-                            )}
-                            {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyExpiry' className='block text-sm font-medium text-gray-700'>
-                                Warranty Expiry
-                              </label>
-                              <input
-                                id='warrantyExpiry'
-                                name='warrantyExpiry'
-                                type='date'
-                                value={formState.warrantyExpiry}
-                                onChange={(e) => setFormState((prev) => ({ ...prev, warrantyExpiry: e.target.value }))}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                              />
-                            </div>
-                            )}
-                            {formState.warranty && (
-                            <div className='sm:col-span-2'>
-                              <label htmlFor='warrantyNotes' className='block text-sm font-medium text-gray-700'>
-                                Warranty Notes
-                              </label>
-                              <textarea
-                                id='warrantyNotes'
-                                name='warrantyNotes'
-                                rows={3}
-                                value={formState.warrantyNotes}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='Any additional warranty details'
-                              />
-                            </div>
-                            )}
                           </>
-                        )}
-                        {formState.category.trim().toLowerCase() !== 'household' && (
+                        ) : (
                           <>
                             <div className='flex items-center gap-2'>
                               <input
@@ -3208,79 +3184,212 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 name='warranty'
                                 type='checkbox'
                                 checked={formState.warranty}
-                                onChange={(e) => setFormState((prev) => ({ ...prev, warranty: e.target.checked }))}
+                                onChange={(e) =>
+                                  setFormState((prev) => ({
+                                    ...prev,
+                                    warranty: e.target.checked,
+                                  }))
+                                }
                                 className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
                               />
-                              <label htmlFor='warranty' className='text-sm font-medium text-gray-700'>
+                              <label
+                                htmlFor='warranty'
+                                className='text-sm font-medium text-gray-700'
+                              >
                                 Under Warranty
                               </label>
                             </div>
                             {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyNumber' className='block text-sm font-medium text-gray-700'>
-                                Warranty Number
-                              </label>
-                              <input
-                                id='warrantyNumber'
-                                name='warrantyNumber'
-                                value={formState.warrantyNumber}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='e.g. ABC-1234567'
-                              />
-                            </div>
+                              <div>
+                                <label
+                                  htmlFor='warrantyNumber'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Number
+                                </label>
+                                <input
+                                  id='warrantyNumber'
+                                  name='warrantyNumber'
+                                  value={formState.warrantyNumber}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='e.g. ABC-1234567'
+                                />
+                              </div>
                             )}
                             {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyPhone' className='block text-sm font-medium text-gray-700'>
-                                Warranty Phone
-                              </label>
-                              <input
-                                id='warrantyPhone'
-                                name='warrantyPhone'
-                                type='tel'
-                                value={formState.warrantyPhone}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='e.g. (800) 555-1234'
-                              />
-                            </div>
+                              <div>
+                                <label
+                                  htmlFor='warrantyPhone'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Phone
+                                </label>
+                                <input
+                                  id='warrantyPhone'
+                                  name='warrantyPhone'
+                                  type='tel'
+                                  value={formState.warrantyPhone}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='e.g. (800) 555-1234'
+                                />
+                              </div>
                             )}
                             {formState.warranty && (
-                            <div>
-                              <label htmlFor='warrantyExpiry' className='block text-sm font-medium text-gray-700'>
-                                Warranty Expiry
-                              </label>
-                              <input
-                                id='warrantyExpiry'
-                                name='warrantyExpiry'
-                                type='date'
-                                value={formState.warrantyExpiry}
-                                onChange={(e) => setFormState((prev) => ({ ...prev, warrantyExpiry: e.target.value }))}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                              />
-                            </div>
+                              <div>
+                                <label
+                                  htmlFor='warrantyExpiry'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Expiry
+                                </label>
+                                <input
+                                  id='warrantyExpiry'
+                                  name='warrantyExpiry'
+                                  type='date'
+                                  value={formState.warrantyExpiry}
+                                  onChange={(e) =>
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      warrantyExpiry: e.target.value,
+                                    }))
+                                  }
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                />
+                              </div>
                             )}
                             {formState.warranty && (
-                            <div className='sm:col-span-2'>
-                              <label htmlFor='warrantyNotes' className='block text-sm font-medium text-gray-700'>
-                                Warranty Notes
-                              </label>
-                              <textarea
-                                id='warrantyNotes'
-                                name='warrantyNotes'
-                                rows={3}
-                                value={formState.warrantyNotes}
-                                onChange={handleFieldChange}
-                                className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
-                                placeholder='Any additional warranty details'
+                              <div className='sm:col-span-2'>
+                                <label
+                                  htmlFor='warrantyNotes'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Notes
+                                </label>
+                                <textarea
+                                  id='warrantyNotes'
+                                  name='warrantyNotes'
+                                  rows={3}
+                                  value={formState.warrantyNotes}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='Any additional warranty details'
+                                />
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {formState.category.trim().toLowerCase() !==
+                          'household' && (
+                          <>
+                            <div className='flex items-center gap-2'>
+                              <input
+                                id='warranty'
+                                name='warranty'
+                                type='checkbox'
+                                checked={formState.warranty}
+                                onChange={(e) =>
+                                  setFormState((prev) => ({
+                                    ...prev,
+                                    warranty: e.target.checked,
+                                  }))
+                                }
+                                className='h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
                               />
+                              <label
+                                htmlFor='warranty'
+                                className='text-sm font-medium text-gray-700'
+                              >
+                                Under Warranty
+                              </label>
                             </div>
+                            {formState.warranty && (
+                              <div>
+                                <label
+                                  htmlFor='warrantyNumber'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Number
+                                </label>
+                                <input
+                                  id='warrantyNumber'
+                                  name='warrantyNumber'
+                                  value={formState.warrantyNumber}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='e.g. ABC-1234567'
+                                />
+                              </div>
+                            )}
+                            {formState.warranty && (
+                              <div>
+                                <label
+                                  htmlFor='warrantyPhone'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Phone
+                                </label>
+                                <input
+                                  id='warrantyPhone'
+                                  name='warrantyPhone'
+                                  type='tel'
+                                  value={formState.warrantyPhone}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='e.g. (800) 555-1234'
+                                />
+                              </div>
+                            )}
+                            {formState.warranty && (
+                              <div>
+                                <label
+                                  htmlFor='warrantyExpiry'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Expiry
+                                </label>
+                                <input
+                                  id='warrantyExpiry'
+                                  name='warrantyExpiry'
+                                  type='date'
+                                  value={formState.warrantyExpiry}
+                                  onChange={(e) =>
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      warrantyExpiry: e.target.value,
+                                    }))
+                                  }
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                />
+                              </div>
+                            )}
+                            {formState.warranty && (
+                              <div className='sm:col-span-2'>
+                                <label
+                                  htmlFor='warrantyNotes'
+                                  className='block text-sm font-medium text-gray-700'
+                                >
+                                  Warranty Notes
+                                </label>
+                                <textarea
+                                  id='warrantyNotes'
+                                  name='warrantyNotes'
+                                  rows={3}
+                                  value={formState.warrantyNotes}
+                                  onChange={handleFieldChange}
+                                  className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
+                                  placeholder='Any additional warranty details'
+                                />
+                              </div>
                             )}
                           </>
                         )}
                         <div>
-                          <label htmlFor='insuranceCompany' className='block text-sm font-medium text-gray-700'>
+                          <label
+                            htmlFor='insuranceCompany'
+                            className='block text-sm font-medium text-gray-700'
+                          >
                             Insurance Company
                           </label>
                           <input
@@ -3293,7 +3402,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                           />
                         </div>
                         <div>
-                          <label htmlFor='insurancePolicyNumber' className='block text-sm font-medium text-gray-700'>
+                          <label
+                            htmlFor='insurancePolicyNumber'
+                            className='block text-sm font-medium text-gray-700'
+                          >
                             Insurance Policy Number
                           </label>
                           <input
@@ -3306,7 +3418,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                           />
                         </div>
                         <div>
-                          <label htmlFor='insuranceExpirationDate' className='block text-sm font-medium text-gray-700'>
+                          <label
+                            htmlFor='insuranceExpirationDate'
+                            className='block text-sm font-medium text-gray-700'
+                          >
                             Insurance Expiration Date
                           </label>
                           <input
@@ -3352,15 +3467,32 @@ export default function HomeDetailPage({ params }: PageProps) {
                               warrantyPhone: asset.warrantyPhone ?? '',
                               warrantyNotes: asset.warrantyNotes ?? '',
                               insuranceCompany: asset.insuranceCompany ?? '',
-                              insurancePolicyNumber: asset.insurancePolicyNumber ?? '',
+                              insurancePolicyNumber:
+                                asset.insurancePolicyNumber ?? '',
                               insuranceExpirationDate:
-                                asset.insuranceExpirationDate && !Number.isNaN(new Date(asset.insuranceExpirationDate as any).getTime())
-                                  ? new Date(asset.insuranceExpirationDate as any).toISOString().split('T')[0]
+                                asset.insuranceExpirationDate &&
+                                !Number.isNaN(
+                                  new Date(
+                                    asset.insuranceExpirationDate as any
+                                  ).getTime()
+                                )
+                                  ? new Date(
+                                      asset.insuranceExpirationDate as any
+                                    )
+                                      .toISOString()
+                                      .split('T')[0]
                                   : '',
                               warranty: Boolean(asset.warranty),
                               warrantyExpiry:
-                                asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
-                                  ? new Date(asset.warrantyExpiry as any).toISOString().split('T')[0]
+                                asset.warrantyExpiry &&
+                                !Number.isNaN(
+                                  new Date(
+                                    asset.warrantyExpiry as any
+                                  ).getTime()
+                                )
+                                  ? new Date(asset.warrantyExpiry as any)
+                                      .toISOString()
+                                      .split('T')[0]
                                   : '',
                             });
                           }}
@@ -3421,30 +3553,49 @@ export default function HomeDetailPage({ params }: PageProps) {
                       {asset?.warranty ? (
                         <div className='rounded-md border border-blue-200 bg-blue-50/60 p-4 text-sm text-gray-700'>
                           <div className='flex items-center justify-between'>
-                            <h3 className='text-sm font-semibold text-blue-800'>Warranty</h3>
+                            <h3 className='text-sm font-semibold text-blue-800'>
+                              Warranty
+                            </h3>
                             <span className='text-xs font-medium text-blue-800'>
-                              {asset.warrantyExpiry && !Number.isNaN(new Date(asset.warrantyExpiry as any).getTime())
-                                ? `Expires ${new Date(asset.warrantyExpiry as any).toLocaleDateString()}`
+                              {asset.warrantyExpiry &&
+                              !Number.isNaN(
+                                new Date(asset.warrantyExpiry as any).getTime()
+                              )
+                                ? `Expires ${new Date(
+                                    asset.warrantyExpiry as any
+                                  ).toLocaleDateString()}`
                                 : 'Active'}
                             </span>
                           </div>
                           <dl className='mt-2 space-y-1'>
                             {asset.warrantyNumber ? (
                               <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
-                                <dt className='text-xs font-medium text-gray-500'>Number</dt>
-                                <dd className='text-sm text-gray-900'>{String(asset.warrantyNumber).trim()}</dd>
+                                <dt className='text-xs font-medium text-gray-500'>
+                                  Number
+                                </dt>
+                                <dd className='text-sm text-gray-900'>
+                                  {String(asset.warrantyNumber).trim()}
+                                </dd>
                               </div>
                             ) : null}
                             {asset.warrantyPhone ? (
                               <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
-                                <dt className='text-xs font-medium text-gray-500'>Phone</dt>
-                                <dd className='text-sm text-gray-900'>{String(asset.warrantyPhone).trim()}</dd>
+                                <dt className='text-xs font-medium text-gray-500'>
+                                  Phone
+                                </dt>
+                                <dd className='text-sm text-gray-900'>
+                                  {String(asset.warrantyPhone).trim()}
+                                </dd>
                               </div>
                             ) : null}
                             {asset.warrantyNotes ? (
                               <div className='grid gap-1 sm:grid-cols-[140px,1fr]'>
-                                <dt className='text-xs font-medium text-gray-500'>Notes</dt>
-                                <dd className='text-sm text-gray-900'>{String(asset.warrantyNotes).trim()}</dd>
+                                <dt className='text-xs font-medium text-gray-500'>
+                                  Notes
+                                </dt>
+                                <dd className='text-sm text-gray-900'>
+                                  {String(asset.warrantyNotes).trim()}
+                                </dd>
                               </div>
                             ) : null}
                           </dl>
@@ -3455,7 +3606,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                 </section>
 
                 <div className='mb-4 rounded-md border-2 border-dotted border-red-400 p-4'>
-                  <h3 className='text-sm font-semibold text-red-700'>Notifier</h3>
+                  <h3 className='text-sm font-semibold text-red-700'>
+                    Notifier
+                  </h3>
                 </div>
 
                 <section className='rounded-lg border border-gray-200 bg-white p-4 shadow-sm'>
@@ -3479,7 +3632,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                         }}
                         className='inline-flex items-center justify-center rounded-full border border-green-400 bg-green-50 p-2 text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-50'
                         aria-label='Add quick info entry'
-                        disabled={isSavingQuickInfoRow || isDeletingQuickInfoRow}
+                        disabled={
+                          isSavingQuickInfoRow || isDeletingQuickInfoRow
+                        }
                       >
                         <Plus className='h-4 w-4' />
                       </button>
@@ -3524,9 +3679,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                         </button>
                       </div>
                       {quickInfoError && (
-                        <p className='text-sm text-red-600'>
-                          {quickInfoError}
-                        </p>
+                        <p className='text-sm text-red-600'>{quickInfoError}</p>
                       )}
                       <div className='grid gap-3 sm:grid-cols-2'>
                         <div>
@@ -3568,9 +3721,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                               className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
                               onMouseDown={(e) => {
                                 e.preventDefault();
-                                const input = e.currentTarget.parentElement?.querySelector(
-                                  "input[type='date']"
-                                ) as HTMLInputElement | null;
+                                const input =
+                                  e.currentTarget.parentElement?.querySelector(
+                                    "input[type='date']"
+                                  ) as HTMLInputElement | null;
                                 if (input) {
                                   try {
                                     (input as any).showPicker?.();
@@ -3606,27 +3760,30 @@ export default function HomeDetailPage({ params }: PageProps) {
                           disabled={isSavingQuickInfoAddition}
                           className='inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50'
                         >
-                          {isSavingQuickInfoAddition ? 'Adding...' : 'Add Entry'}
+                          {isSavingQuickInfoAddition
+                            ? 'Adding...'
+                            : 'Add Entry'}
                         </button>
                       </div>
                     </form>
                   )}
                   {!quickInfoAddType && quickInfoError && (
-                    <p className='mt-4 text-sm text-red-600'>{quickInfoError}</p>
+                    <p className='mt-4 text-sm text-red-600'>
+                      {quickInfoError}
+                    </p>
                   )}
                   <div
                     className={`mt-4 space-y-4 text-sm text-gray-700${
-                      quickInfoAddType
-                        ? ' border-t border-gray-200 pt-4'
-                        : ''
+                      quickInfoAddType ? ' border-t border-gray-200 pt-4' : ''
                     }`}
                   >
                     {quickInfoRows.length > 0 ? (
                       <div className='overflow-x-auto rounded-lg border border-gray-200'>
                         <table className='min-w-full divide-y divide-gray-200 text-left'>
                           <thead className='bg-gray-50'>
-                            {quickInfoTable.getHeaderGroups().map(
-                              (headerGroup) => (
+                            {quickInfoTable
+                              .getHeaderGroups()
+                              .map((headerGroup) => (
                                 <tr key={headerGroup.id}>
                                   {headerGroup.headers.map((header) => (
                                     <th
@@ -3643,8 +3800,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                     </th>
                                   ))}
                                 </tr>
-                              )
-                            )}
+                              ))}
                           </thead>
                           <tbody className='divide-y divide-gray-200 bg-white'>
                             {quickInfoTable.getRowModel().rows.map((row) => (
@@ -3673,7 +3829,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                   </div>
                 </section>
 
-                <section id='maintenance-section' className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+                <section
+                  id='maintenance-section'
+                  className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'
+                >
                   <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold text-gray-900'>
                       Maintenance
@@ -3769,9 +3928,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                                   className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
                                   onMouseDown={(e) => {
                                     e.preventDefault();
-                                    const input = e.currentTarget.parentElement?.querySelector(
-                                      "input[type='date']"
-                                    ) as HTMLInputElement | null;
+                                    const input =
+                                      e.currentTarget.parentElement?.querySelector(
+                                        "input[type='date']"
+                                      ) as HTMLInputElement | null;
                                     if (input) {
                                       try {
                                         (input as any).showPicker?.();
@@ -3915,8 +4075,8 @@ export default function HomeDetailPage({ params }: PageProps) {
                       </div>
                     ) : (
                       <p className='text-sm text-gray-500'>
-                        Paste a YouTube URL and add it, or use the table
-                        below to select a video to play.
+                        Paste a YouTube URL and add it, or use the table below
+                        to select a video to play.
                       </p>
                     )}
                   </div>
@@ -3941,17 +4101,26 @@ export default function HomeDetailPage({ params }: PageProps) {
                           ...(asset.videos ?? []),
                           newEntry,
                         ];
-                        const targetRef = ref(db, `assets/${currentUser.UserId}/${id}`);
-                        const updatedAsset = { ...asset, videos: nextVideos } as Vehicle &
-                          Record<string, unknown>;
-                        const sanitized = JSON.parse(JSON.stringify(updatedAsset));
+                        const targetRef = ref(
+                          db,
+                          `assets/${currentUser.UserId}/${id}`
+                        );
+                        const updatedAsset = {
+                          ...asset,
+                          videos: nextVideos,
+                        } as Vehicle & Record<string, unknown>;
+                        const sanitized = JSON.parse(
+                          JSON.stringify(updatedAsset)
+                        );
                         await set(targetRef, sanitized);
                         setVideoAddUrl('');
                         setVideoAddTitle('');
                         // Do not auto-play newly added video; wait for user click.
                       } catch (error) {
                         console.error('Failed to add video', error);
-                        setVideoAddError('Unable to add video. Please try again.');
+                        setVideoAddError(
+                          'Unable to add video. Please try again.'
+                        );
                       } finally {
                         setIsAddingVideo(false);
                       }
@@ -4016,7 +4185,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                   </form>
                   <div className='mt-4'>
                     {!editingVideoRowId && updateVideoError && (
-                      <p className='mb-2 text-sm text-red-600'>{updateVideoError}</p>
+                      <p className='mb-2 text-sm text-red-600'>
+                        {updateVideoError}
+                      </p>
                     )}
                     {videoData.length > 0 ? (
                       <div className='overflow-x-auto rounded-lg border border-gray-200'>
@@ -4045,7 +4216,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                             {videoTable.getRowModel().rows.map((row) => (
                               <tr key={row.id} className='hover:bg-gray-50'>
                                 {row.getVisibleCells().map((cell) => (
-                                  <td key={cell.id} className='px-4 py-2 text-gray-700'>
+                                  <td
+                                    key={cell.id}
+                                    className='px-4 py-2 text-gray-700'
+                                  >
                                     {flexRender(
                                       cell.column.columnDef.cell,
                                       cell.getContext()
@@ -4074,11 +4248,15 @@ export default function HomeDetailPage({ params }: PageProps) {
                   <div className='mt-4 space-y-3'>
                     <div
                       className={`flex items-center text-sm text-gray-600 overflow-hidden transition-all duration-500 ${
-                        isGeneratingAiDescription ? 'opacity-100 max-h-8' : 'opacity-0 max-h-0'
+                        isGeneratingAiDescription
+                          ? 'opacity-100 max-h-8'
+                          : 'opacity-0 max-h-0'
                       }`}
                     >
                       <span className='mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent' />
-                      <span className='ai-fade'>Generating AI description...</span>
+                      <span className='ai-fade'>
+                        Generating AI description...
+                      </span>
                     </div>
                     {hasDescriptionPrompt ? (
                       descriptionSourceOverride ? (
@@ -4153,7 +4331,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                         <p className='text-sm text-red-600'>{notesError}</p>
                       )}
                       <div>
-                        <label htmlFor='general-notes' className='block text-sm font-medium text-gray-700'>
+                        <label
+                          htmlFor='general-notes'
+                          className='block text-sm font-medium text-gray-700'
+                        >
                           Notes
                         </label>
                         <textarea
@@ -4195,14 +4376,12 @@ export default function HomeDetailPage({ params }: PageProps) {
                         : full;
                       return (
                         <p className='mt-2 whitespace-pre-line text-sm text-gray-700'>
-                          {isNotesExpanded ? preview && shouldTruncate ? (
-                            // When expanded and truncated exists, show full content
-                            full
-                          ) : (
-                            full
-                          ) : (
-                            preview
-                          )}
+                          {isNotesExpanded
+                            ? preview && shouldTruncate
+                              ? // When expanded and truncated exists, show full content
+                                full
+                              : full
+                            : preview}
                           {shouldTruncate && (
                             <>
                               {' '}
@@ -4234,7 +4413,8 @@ export default function HomeDetailPage({ params }: PageProps) {
                     })()
                   ) : (
                     <p className='mt-2 text-sm text-gray-500'>
-                      No notes yet. Add any general details, reminders, or context here.
+                      No notes yet. Add any general details, reminders, or
+                      context here.
                     </p>
                   )}
                 </section>
@@ -4242,7 +4422,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                 <section className='rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
                   <div className='flex items-center justify-between'>
                     <h2 className='text-xl font-semibold text-gray-900'>
-                      List of Parts
+                      List of Parts/Links
                     </h2>
                     <button
                       type='button'
@@ -4294,7 +4474,7 @@ export default function HomeDetailPage({ params }: PageProps) {
                                 className='mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900'
                               />
                             </div>
-                            
+
                             <div>
                               <label
                                 htmlFor={`part-url-${index}`}
@@ -4328,9 +4508,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                                   className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400'
                                   onMouseDown={(e) => {
                                     e.preventDefault();
-                                    const input = e.currentTarget.parentElement?.querySelector(
-                                      "input[type='date']"
-                                    ) as HTMLInputElement | null;
+                                    const input =
+                                      e.currentTarget.parentElement?.querySelector(
+                                        "input[type='date']"
+                                      ) as HTMLInputElement | null;
                                     if (input) {
                                       try {
                                         (input as any).showPicker?.();
@@ -4477,7 +4658,10 @@ export default function HomeDetailPage({ params }: PageProps) {
         >
           <div className='w-full max-w-3xl rounded-lg bg-white p-8 shadow-xl md:max-h-[85vh] overflow-auto'>
             <div className='mb-4'>
-              <h2 id='notes-modal-title' className='text-lg font-semibold text-gray-900'>
+              <h2
+                id='notes-modal-title'
+                className='text-lg font-semibold text-gray-900'
+              >
                 Asset Notes
               </h2>
               <p className='mt-1 text-sm text-gray-600'>
@@ -4489,7 +4673,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                 <p className='text-sm text-red-600'>{notesError}</p>
               )}
               <div>
-                <label htmlFor='notes-modal-textarea' className='block text-sm font-medium text-gray-700'>
+                <label
+                  htmlFor='notes-modal-textarea'
+                  className='block text-sm font-medium text-gray-700'
+                >
                   Notes
                 </label>
                 <textarea
@@ -4533,7 +4720,10 @@ export default function HomeDetailPage({ params }: PageProps) {
           aria-labelledby='part-note-modal-title'
         >
           <div className='w-full max-w-xl rounded-lg bg-white p-6 shadow-xl'>
-            <h2 id='part-note-modal-title' className='text-lg font-semibold text-gray-900'>
+            <h2
+              id='part-note-modal-title'
+              className='text-lg font-semibold text-gray-900'
+            >
               Part Note
             </h2>
             <p className='mt-1 text-sm text-gray-600'>
@@ -4542,7 +4732,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                   const p = asset?.partNumber?.[activePartNoteIndex ?? -1];
                   const label = (p?.part || p?.type || '').toString().trim();
                   return label ? `For: ${label}` : '';
-                } catch { return ''; }
+                } catch {
+                  return '';
+                }
               })()}
             </p>
             <form onSubmit={handleSavePartNote} className='mt-4 space-y-3'>
@@ -4550,7 +4742,10 @@ export default function HomeDetailPage({ params }: PageProps) {
                 <p className='text-sm text-red-600'>{partNoteError}</p>
               )}
               <div>
-                <label htmlFor='part-note-textarea' className='block text-sm font-medium text-gray-700'>
+                <label
+                  htmlFor='part-note-textarea'
+                  className='block text-sm font-medium text-gray-700'
+                >
                   Note
                 </label>
                 <textarea
@@ -4568,7 +4763,9 @@ export default function HomeDetailPage({ params }: PageProps) {
                   onClick={() => {
                     setIsPartNoteModalOpen(false);
                     setPartNoteError(null);
-                    setPartNoteDraft(asset?.partNumber?.[activePartNoteIndex ?? -1]?.note ?? '');
+                    setPartNoteDraft(
+                      asset?.partNumber?.[activePartNoteIndex ?? -1]?.note ?? ''
+                    );
                   }}
                   disabled={isSavingPartNote}
                   className='inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50'
@@ -4601,9 +4798,7 @@ export default function HomeDetailPage({ params }: PageProps) {
             >
               {deleteModalTitle}
             </h2>
-            <p className='mt-2 text-sm text-gray-600'>
-              {deleteModalMessage}
-            </p>
+            <p className='mt-2 text-sm text-gray-600'>{deleteModalMessage}</p>
             <div className='mt-6 flex justify-end gap-3'>
               <button
                 type='button'
@@ -4628,4 +4823,3 @@ export default function HomeDetailPage({ params }: PageProps) {
     </>
   );
 }
-  
