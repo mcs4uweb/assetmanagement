@@ -19,6 +19,7 @@
 
 # production
 /build
+src/_ExportedFileContents/*
 
 # misc
 .DS_Store
