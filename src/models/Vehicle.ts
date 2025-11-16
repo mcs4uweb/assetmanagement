@@ -42,8 +42,8 @@ export interface Video {
 export interface Odometer {
   odometer?: number
   type?: string
-  date?: Date
-  reading?: Date
+  date?: Date | string
+  reading?: Date | string
 }
 
 export interface OilChange {

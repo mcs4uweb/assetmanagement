@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
+  output: 'export', // ← enables static export
+  distDir: 'out',   // default is 'out'
   typescript: {
     ignoreBuildErrors: false,
   },

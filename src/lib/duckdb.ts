@@ -29,11 +29,14 @@ export async function getDuckDB(): Promise<DuckDBNS.AsyncDuckDB> {
     // You can switch to `duckdb.getBundledBundles()` if hosting assets locally.
     const bundles = duckdb.getJsDelivrBundles();
     const bundle = await duckdb.selectBundle(bundles);
+    if (!bundle || !bundle.mainWorker || !bundle.mainModule) {
+      throw new Error('DuckDB-WASM bundle not available for this environment');
+    }
 
     const worker = new Worker(bundle.mainWorker, { type: 'module' });
     const logger = new duckdb.ConsoleLogger();
     const db = new duckdb.AsyncDuckDB(logger, worker);
-    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker || undefined);
     return db;
   })();
 
@@ -98,4 +101,3 @@ export async function resetDuckDB() {
 //   import { getConnection, queryObjects } from '@/lib/duckdb';
 //   const rows = await queryObjects('SELECT 42 AS answer');
 //   console.log(rows); // [{ answer: 42 }]
-

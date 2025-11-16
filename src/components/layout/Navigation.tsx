@@ -85,6 +85,11 @@ const Navigation: React.FC = () => {
     { name: 'Dashboard', href: '/dashboard', current: pathname === '/dashboard' },
     { name: 'My Assets', href: '/home', current: pathname === '/home' },
     { name: 'Calendar', href: '/calender', current: pathname === '/calender' },
+    {
+      name: 'Tasks',
+      href: '/tasks',
+      current: pathname === '/tasks',
+    },
     { name: 'Blog', href: '/blog', current: pathname.startsWith('/blog') },
     {
       name: 'Asset Manager Pro',
